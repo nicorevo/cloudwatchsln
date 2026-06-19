@@ -1,0 +1,48 @@
+{
+  "environment": "uat",
+  "project": "your project name",
+  "aws": {
+    "region": "eu-central-1",
+    "profile": "YOUR_AWS_SSO_PROFILE",
+    "credentialRefreshIntervalMinutes": 55,
+    "loginOnStartupIfNeeded": false,
+    "ssoSessionWarningMinutes": 30
+  },
+  "cloudwatch": {
+    "logGroups": [
+      "/eks/logname01",
+      "/eks/logname02"
+    ],
+    "filterPattern": "",
+    "maxResults": 100000,
+    "monitorPatterns": [],
+    "exceptionPatterns": [
+      " ERROR ",
+      "Error on main",
+      "Main Error"
+    ]
+  },
+  "schedule": {
+    "downloadInterval": "*/1 * * * *",
+    "cleanupInterval": "*/60 * * * *"
+  },
+  "files": {
+    "logDirectory": "./logs",
+    "retentionMinutes": 60,
+    "filePrefix": "my-app-logs-prod",
+    "preserveExceptionPairs": true
+  },
+  "logging": {
+    "level": "info",
+    "enableConsole": true
+  },
+  "monitor": {
+    "enabled": true,
+    "host": "127.0.0.1",
+    "port": 3847,
+    "contextLinesBefore": 10,
+    "contextLinesAfter": 10,
+    "treeRefreshSeconds": 30,
+    "maxExceptionFiles": 50
+  }
+}

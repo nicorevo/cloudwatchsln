@@ -1,0 +1,21 @@
+name: Spec Compliance
+
+on:
+  push:
+    paths: ['specs/**', 'src/**']
+  pull_request:
+    paths: ['specs/**', 'src/**']
+
+jobs:
+  validate-openapi:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate OpenAPI spec
+        uses: char0n/swagger-editor-validate@v1
+        with:
+          definition-file: specs/openapi-example.yaml
+
+      - name: Check spec compliance
+        run: echo "Add your OpenAPI compliance check here (e.g., openapi-diff)"

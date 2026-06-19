@@ -1,0 +1,37 @@
+{
+  "name": "cloudwatch-log-downloader",
+  "version": "1.0.0",
+  "description": "Servizio per scaricare log da AWS CloudWatch con rolling automatico e supporto SSO",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "CONFIG_ENV=uat node src/index.js",
+    "start:uat": "CONFIG_ENV=uat node src/index.js",
+    "start:prod": "CONFIG_ENV=prod node src/index.js",
+    "test": "node --test tests/",
+    "dev": "nodemon src/index.js",
+    "check-sso-expiry": "node scripts/check-sso-expiry.js",
+    "check-sso-expiry:prod": "CONFIG_ENV=prod node scripts/check-sso-expiry.js",
+    "check-sso-expiry:uat": "CONFIG_ENV=uat node scripts/check-sso-expiry.js"
+  },
+  "dependencies": {
+    "@aws-sdk/client-cloudwatch-logs": "^3.899.0",
+    "@aws-sdk/client-sts": "^3.1072.0",
+    "@aws-sdk/credential-providers": "^3.899.0",
+    "fs-extra": "^11.1.1",
+    "moment": "^2.29.4",
+    "node-cron": "^3.0.3"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
+  "keywords": [
+    "aws",
+    "cloudwatch",
+    "logs",
+    "monitoring",
+    "nodejs",
+    "sso"
+  ],
+  "author": "Il tuo nome",
+  "license": "MIT"
+}

@@ -1,0 +1,22 @@
+# Local / private config (never commit)
+cloudwatch-log-downloader/config.uat.json
+cloudwatch-log-downloader/config.prod.json
+cloudwatch-log-downloader/config.json
+cloudwatch-log-downloader/logs/
+cloudwatch-log-downloader/node_modules/
+
+# Private application examples (local only)
+download-mail/
+
+# Archives / scratch
+src/*.zip
+
+# OS / IDE
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Secrets
+.env
+.aws/

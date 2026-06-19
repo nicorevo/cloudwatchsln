@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Exception Monitor</title>
+    <link rel="stylesheet" href="/css/monitor.css">
+</head>
+<body>
+    <div class="app">
+        <aside class="sidebar">
+            <header class="sidebar-header">
+                <h1>Eccezioni</h1>
+                <div class="sidebar-meta">
+                    <span id="exception-count" class="badge">0</span>
+                    <span id="last-refresh" class="muted">—</span>
+                </div>
+            </header>
+            <div id="exception-tree" class="tree">
+                <p class="placeholder">Caricamento albero eccezioni...</p>
+            </div>
+        </aside>
+        <main class="detail-panel">
+            <div id="detail-empty" class="detail-empty">
+                Seleziona un'eccezione dall'albero
+            </div>
+            <div id="detail-content" class="detail-content hidden">
+                <header class="detail-header">
+                    <h2 id="detail-title">Eccezione</h2>
+                    <div id="detail-meta" class="detail-meta"></div>
+                </header>
+                <div id="detail-warning" class="detail-warning hidden"></div>
+                <pre id="detail-log" class="detail-log"></pre>
+            </div>
+        </main>
+    </div>
+    <script src="/js/monitor.js"></script>
+</body>
+</html>
