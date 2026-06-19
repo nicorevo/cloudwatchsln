@@ -89,7 +89,22 @@ Campi essenziali:
 | `filePrefix` | Prefisso nomi file in `./logs/` |
 | `monitor.enabled` | UI eccezioni su `http://127.0.0.1:3847` |
 
-Guida completa: [`docs/configuration-guide.md`](docs/configuration-guide.md)
+Altri campi utili in `config.sample.json`:
+
+| Sezione | Campo | Default | Descrizione |
+|---------|-------|---------|-------------|
+| `aws` | `credentialRefreshIntervalMinutes` | `55` | Refresh proattivo credenziali STS |
+| `aws` | `loginOnStartupIfNeeded` | `false` | Apre browser SSO se sessione assente |
+| `cloudwatch` | `monitorPatterns` | `[]` | Vuoto = tutte le righe nel file main |
+| `files` | `preserveExceptionPairs` | `true` | Non cancella coppie eccezione/main |
+| `monitor` | `port` | `3847` | Porta Exception Monitor |
+| `schedule` | `downloadInterval` | `*/1 * * * *` | Cron download (Europe/Rome) |
+
+Scopri log group EKS:
+
+```bash
+aws logs describe-log-groups --profile YOUR_AWS_PROFILE --log-group-name-prefix "/eks/"
+```
 
 ### 3. Login AWS e avvio
 
@@ -132,7 +147,17 @@ Il passo più importante per un nuovo progetto è popolare `exceptionPatterns[]`
 4. **Incolla i pattern** in `config.prod.json` → riavvia il servizio.
 5. **Verifica** in `./logs/*-exceptions_*.log` e nella UI su `:3847`.
 
-Guida dettagliata: [`docs/exception-patterns-guide.md`](docs/exception-patterns-guide.md)
+Pattern generici di partenza:
+
+```json
+"exceptionPatterns": [
+  " ERROR ",
+  " FATAL ",
+  "Exception",
+  "Traceback (most recent call last)",
+  "Caused by:"
+]
+```
 
 ---
 
@@ -147,7 +172,7 @@ Con `monitor.enabled: true` (default nel sample):
 | `GET /api/v1/exceptions/:id` | Eccezione + righe before/after dal file main |
 | `GET /api/v1/health` | Stato monitor |
 
-Contratto API: [`docs/API-contract-exception-monitor.md`](docs/API-contract-exception-monitor.md)
+Disabilitare: `"monitor": { "enabled": false }`.
 
 ---
 
@@ -162,17 +187,7 @@ Contratto API: [`docs/API-contract-exception-monitor.md`](docs/API-contract-exce
 
 Setup SSO iniziale: `cloudwatch-log-downloader/setup-sso.sh`
 
----
-
-## Documentazione
-
-| Documento | Contenuto |
-|-----------|-----------|
-| [`docs/configuration-guide.md`](docs/configuration-guide.md) | Tutti i campi config |
-| [`docs/exception-patterns-guide.md`](docs/exception-patterns-guide.md) | Pattern eccezioni + workflow AI |
-| [`docs/spec-aws-sso-session.md`](docs/spec-aws-sso-session.md) | Sessione SSO e refresh credenziali |
-| [`cloudwatch-log-downloader/README.md`](cloudwatch-log-downloader/README.md) | Riferimento tecnico modulo |
-| [`cloudwatch-log-downloader/QUICK_START.md`](cloudwatch-log-downloader/QUICK_START.md) | Guida operativa rapida |
+**Sessione SSO:** le credenziali STS si rinnovano automaticamente ogni ~55 min; la sessione portal (browser) va rinnovata con `aws sso login` quando scade.
 
 ---
 

@@ -8,6 +8,31 @@ cloudwatch-log-downloader/node_modules/
 # Private application examples (local only)
 download-mail/
 
+# Local extended documentation (not published)
+docs/
+
+# AI / agent tooling (local only — not on GitHub)
+.agents/
+.cursor/
+.husky/
+.github/
+.pre-commit-config.yaml
+skills-lock.json
+AGENTS.md
+claude.md
+AI-GOVERNANCE.md
+CODING-STANDARDS.md
+CONTRIBUTING.md
+SECURITY.md
+scripts/check_ai_traceability.py
+scripts/generate_prd_scaffold.sh
+scripts/validate_frontmatter.py
+
+# Extra markdown (only root README.md is published)
+cloudwatch-log-downloader/README.md
+cloudwatch-log-downloader/QUICK_START.md
+cloudwatch-log-downloader/read.me.aws
+
 # Archives / scratch
 src/*.zip
 
