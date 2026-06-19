@@ -25,7 +25,7 @@ async function fetchJson(url) {
 }
 
 function formatRefreshTime(date) {
-    return date.toLocaleTimeString('it-IT');
+    return date.toLocaleTimeString('en-US');
 }
 
 function classifyLine(text) {
@@ -43,10 +43,10 @@ function classifyLine(text) {
 function renderTree(tree) {
     const totalExceptions = tree.files.reduce((sum, file) => sum + file.exceptionCount, 0);
     exceptionCount.textContent = String(totalExceptions);
-    lastRefresh.textContent = `Aggiornato ${formatRefreshTime(new Date(tree.generatedAt))}`;
+    lastRefresh.textContent = `Updated ${formatRefreshTime(new Date(tree.generatedAt))}`;
 
     if (tree.files.length === 0) {
-        treeContainer.innerHTML = '<p class="placeholder">Nessuna eccezione trovata</p>';
+        treeContainer.innerHTML = '<p class="placeholder">No exceptions found</p>';
         return;
     }
 
@@ -104,7 +104,7 @@ function renderDetail(detail) {
     detailEmpty.classList.add('hidden');
     detailContent.classList.remove('hidden');
 
-    detailTitle.textContent = `Eccezione ${detail.id}`;
+    detailTitle.textContent = `Exception ${detail.id}`;
     detailMeta.textContent = [
         detail.exception.timestamp || 'timestamp n/d',
         detail.exception.source || 'source n/d',
@@ -113,7 +113,7 @@ function renderDetail(detail) {
     ].join(' · ');
 
     if (detail.warning) {
-        detailWarning.textContent = `Attenzione: ${detail.warning}`;
+        detailWarning.textContent = `Warning: ${detail.warning}`;
         detailWarning.classList.remove('hidden');
     } else {
         detailWarning.classList.add('hidden');
@@ -145,7 +145,7 @@ async function loadExceptionDetail(exceptionId) {
     } catch (error) {
         detailEmpty.classList.remove('hidden');
         detailContent.classList.add('hidden');
-        detailEmpty.textContent = `Errore caricamento dettaglio: ${error.message}`;
+        detailEmpty.textContent = `Error loading detail: ${error.message}`;
     }
 }
 
@@ -184,11 +184,11 @@ async function refreshTree() {
                 state.selectedId = null;
                 detailContent.classList.add('hidden');
                 detailEmpty.classList.remove('hidden');
-                detailEmpty.textContent = 'Seleziona un\'eccezione dall\'albero';
+                detailEmpty.textContent = 'Select an exception from the tree';
             }
         }
     } catch (error) {
-        treeContainer.innerHTML = `<p class="placeholder">Errore caricamento albero: ${error.message}</p>`;
+        treeContainer.innerHTML = `<p class="placeholder">Error loading tree: ${error.message}</p>`;
     }
 }
 

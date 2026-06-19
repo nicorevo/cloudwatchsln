@@ -1,7 +1,7 @@
 {
   "name": "cloudwatch-log-downloader",
   "version": "1.0.0",
-  "description": "Servizio per scaricare log da AWS CloudWatch con rolling automatico e supporto SSO",
+  "description": "Download AWS CloudWatch logs with automatic rolling and SSO support",
   "main": "src/index.js",
   "scripts": {
     "start": "CONFIG_ENV=uat node src/index.js",
@@ -32,6 +32,6 @@
     "nodejs",
     "sso"
   ],
-  "author": "Il tuo nome",
+  "author": "",
   "license": "MIT"
 }

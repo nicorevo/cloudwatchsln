@@ -36,8 +36,8 @@ class CloudWatchLogDownloader {
 
         if (!configEnv) {
             throw new Error(
-                'CONFIG_ENV non impostato. Usa npm run start:uat o npm run start:prod. ' +
-                'Copia config.sample.json in config.uat.json o config.prod.json.'
+                'CONFIG_ENV is not set. Use npm run start:uat or npm run start:prod. ' +
+                'Copy config.sample.json to config.uat.json or config.prod.json.'
             );
         }
 
@@ -48,7 +48,7 @@ class CloudWatchLogDownloader {
         try {
             await this.loadConfig();
             this.logger = new Logger(this.config);
-            this.logger.info('=== CloudWatch Log Downloader avviato ===');
+            this.logger.info('=== CloudWatch Log Downloader started ===');
 
             this.authManager = new AwsAuthManager(this.config.aws, this.logger);
             await this.authManager.authenticate();
@@ -57,9 +57,9 @@ class CloudWatchLogDownloader {
             await this.cloudWatchClient.init();
             this.fileManager = new FileManager(this.config, this.logger);
 
-            this.lastProcessedTime = Date.now() - (15 * 60 * 1000); // 15 minuti fa
+            this.lastProcessedTime = Date.now() - (15 * 60 * 1000); // 15 minutes ago
 
-            this.logger.info('Inizializzazione completata', {
+            this.logger.info('Initialization complete', {
                 configFile: path.basename(this.configPath),
                 environment: this.config.environment,
                 project: this.config.project,
@@ -83,7 +83,7 @@ class CloudWatchLogDownloader {
             }
 
         } catch (error) {
-            console.error('Errore durante l\'inizializzazione:', error);
+            console.error('Initialization error:', error);
             process.exit(1);
         }
     }
@@ -92,8 +92,8 @@ class CloudWatchLogDownloader {
         try {
             if (!await fs.pathExists(this.configPath)) {
                 throw new Error(
-                    `File di configurazione non trovato: ${this.configPath}. ` +
-                    'Copia config.sample.json in config.uat.json o config.prod.json e personalizza i valori.'
+                    `Configuration file not found: ${this.configPath}. ` +
+                    'Copy config.sample.json to config.uat.json or config.prod.json and customize the values.'
                 );
             }
 
@@ -103,7 +103,7 @@ class CloudWatchLogDownloader {
             this.config.monitor = normalizeMonitorConfig(this.config);
 
         } catch (error) {
-            throw new Error(`Errore nel caricamento della configurazione: ${error.message}`);
+            throw new Error(`Failed to load configuration: ${error.message}`);
         }
     }
 
@@ -117,7 +117,7 @@ class CloudWatchLogDownloader {
             for (const key of keys) {
                 value = value[key];
                 if (value === undefined) {
-                    throw new Error(`Campo di configurazione obbligatorio mancante: ${field}`);
+                    throw new Error(`Missing required configuration field: ${field}`);
                 }
             }
         }
@@ -125,7 +125,7 @@ class CloudWatchLogDownloader {
         const { logGroups, logGroupName } = this.config.cloudwatch || {};
         const hasLogGroups = Array.isArray(logGroups) && logGroups.length > 0;
         if (!hasLogGroups && !logGroupName) {
-            throw new Error('Configurazione CloudWatch non valida: specificare cloudwatch.logGroups[] o cloudwatch.logGroupName');
+            throw new Error('Invalid CloudWatch configuration: set cloudwatch.logGroups[] or cloudwatch.logGroupName');
         }
     }
 
@@ -134,7 +134,7 @@ class CloudWatchLogDownloader {
             const endTime = Date.now();
             const startTime = this.lastProcessedTime;
 
-            this.logger.info('Avvio download log', {
+            this.logger.info('Starting log download', {
                 startTime: new Date(startTime).toISOString(),
                 endTime: new Date(endTime).toISOString(),
                 interval: moment.duration(endTime - startTime).humanize()
@@ -144,15 +144,15 @@ class CloudWatchLogDownloader {
 
             if (events.length > 0) {
                 await this.fileManager.writeLogsToFile(events);
-                this.logger.info(`Download completato: ${events.length} eventi processati`);
+                this.logger.info(`Download complete: ${events.length} events processed`);
             } else {
-                this.logger.info('Nessun nuovo log trovato nel periodo specificato');
+                this.logger.info('No new logs found for the specified period');
             }
 
             this.lastProcessedTime = endTime;
 
         } catch (error) {
-            this.logger.error('Errore durante il download dei log:', {
+            this.logger.error('Error downloading logs:', {
                 message: error.message,
                 stack: error.stack
             });
@@ -161,18 +161,18 @@ class CloudWatchLogDownloader {
 
     async cleanupOldFiles() {
         try {
-            this.logger.info('Avvio pulizia file vecchi...');
+            this.logger.info('Starting old file cleanup...');
             await this.fileManager.cleanupOldFiles();
 
             const files = await this.fileManager.getFileList();
-            this.logger.info('File attuali:', {
+            this.logger.info('Current files:', {
                 count: files.length,
                 totalSize: files.reduce((sum, f) => sum + f.size, 0),
-                oldestFile: files.length > 0 ? files[files.length - 1].name : 'nessuno'
+                oldestFile: files.length > 0 ? files[files.length - 1].name : 'none'
             });
 
         } catch (error) {
-            this.logger.error('Errore durante la pulizia:', error.message);
+            this.logger.error('Cleanup error:', error.message);
         }
     }
 
@@ -191,7 +191,7 @@ class CloudWatchLogDownloader {
             timezone: 'Europe/Rome'
         });
 
-        this.logger.info('Job schedulati avviati', {
+        this.logger.info('Scheduled jobs started', {
             downloadInterval: this.config.schedule.downloadInterval,
             cleanupInterval: this.config.schedule.cleanupInterval,
             credentialRefreshIntervalMinutes: this.config.aws.credentialRefreshIntervalMinutes
@@ -201,7 +201,7 @@ class CloudWatchLogDownloader {
 
         const shutdown = async () => {
             try {
-                this.logger.info('Arresto del servizio...');
+                this.logger.info('Shutting down service...');
                 this.downloadJob.stop();
                 this.cleanupJob.stop();
                 this.stopCredentialRefreshJob();
@@ -212,20 +212,20 @@ class CloudWatchLogDownloader {
 
                 process.exit(0);
             } catch (error) {
-                this.logger.error('Errore durante lo shutdown:', error.message);
+                this.logger.error('Shutdown error:', error.message);
                 process.exit(1);
             }
         };
 
         process.on('SIGINT', () => {
             shutdown().catch(error => {
-                console.error('Errore durante lo shutdown:', error);
+                console.error('Shutdown error:', error);
                 process.exit(1);
             });
         });
         process.on('SIGTERM', () => {
             shutdown().catch(error => {
-                console.error('Errore durante lo shutdown:', error);
+                console.error('Shutdown error:', error);
                 process.exit(1);
             });
         });
@@ -237,13 +237,13 @@ class CloudWatchLogDownloader {
 
         this.credentialRefreshTimer = setInterval(() => {
             this.authManager.refreshCredentials().catch(error => {
-                this.logger.error('Rinnovo credenziali AWS fallito:', {
+                this.logger.error('AWS credential refresh failed:', {
                     message: error.message
                 });
             });
         }, intervalMs);
 
-        this.logger.info('Refresh credenziali AWS programmato', {
+        this.logger.info('AWS credential refresh scheduled', {
             everyMinutes: intervalMinutes
         });
     }
@@ -261,15 +261,15 @@ class CloudWatchLogDownloader {
         }
 
         const baseUrl = `http://${this.config.monitor.host}:${this.config.monitor.port}`;
-        console.log(`Console web:  ${baseUrl}/`);
-        console.log(`API REST:     ${baseUrl}/api/v1`);
+        console.log(`Web console:  ${baseUrl}/`);
+        console.log(`REST API:     ${baseUrl}/api/v1`);
     }
 
     async start() {
         await this.init();
         await this.downloadLogs();
         this.startScheduledJobs();
-        this.logger.info('Servizio in esecuzione. Premi Ctrl+C per fermare.');
+        this.logger.info('Service running. Press Ctrl+C to stop.');
         this.printMonitorUrls();
     }
 }
@@ -277,7 +277,7 @@ class CloudWatchLogDownloader {
 if (require.main === module) {
     const downloader = new CloudWatchLogDownloader();
     downloader.start().catch(error => {
-        console.error('Errore fatale:', error);
+        console.error('Fatal error:', error);
         process.exit(1);
     });
 }

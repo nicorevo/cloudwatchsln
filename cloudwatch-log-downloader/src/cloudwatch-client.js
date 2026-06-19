@@ -37,7 +37,7 @@ class CloudWatchClient {
 
     async init() {
         if (!this.authManager || !this.authManager.isAuthenticated()) {
-            throw new Error('AwsAuthManager non autenticato');
+            throw new Error('AwsAuthManager not authenticated');
         }
 
         await this.rebuildClient();
@@ -54,7 +54,7 @@ class CloudWatchClient {
 
     ensureInitialized() {
         if (!this.initialized || !this.client) {
-            throw new Error('CloudWatchClient non inizializzato');
+            throw new Error('CloudWatchClient not initialized');
         }
     }
 
@@ -69,7 +69,7 @@ class CloudWatchClient {
     async testCredentials() {
         const logGroupName = this.logGroups[0];
         if (!logGroupName) {
-            throw new Error('Nessun log group configurato');
+            throw new Error('No log groups configured');
         }
 
         try {
@@ -81,7 +81,7 @@ class CloudWatchClient {
             });
 
             await this.client.send(command);
-            this.logger.info('✅ Credenziali AWS SSO funzionanti');
+            this.logger.info('✅ AWS SSO credentials working');
 
         } catch (error) {
             this.handleAuthError(error);
@@ -146,7 +146,7 @@ class CloudWatchClient {
                     throw buildSsoExpiredError(this.config.aws.profile);
                 }
 
-                this.logger.error(`Errore nella paginazione [${logGroupName}]:`, error.message);
+                this.logger.error(`Pagination error [${logGroupName}]:`, error.message);
                 break;
             }
         } while (nextToken && pageCount < maxPages);
@@ -168,7 +168,7 @@ class CloudWatchClient {
             allEvents = allEvents.concat(filteredEvents);
         }
 
-        this.logger.info('Eventi per log group', { countsByGroup, total: allEvents.length });
+        this.logger.info('Events per log group', { countsByGroup, total: allEvents.length });
 
         allEvents.sort((a, b) => a.timestamp - b.timestamp);
         return allEvents.slice(0, maxResults);

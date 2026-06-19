@@ -24,14 +24,14 @@ async function resolveProfile() {
 
 function formatDuration(minutes) {
     if (minutes <= 0) {
-        return 'scaduta';
+        return 'expired';
     }
 
     const hours = Math.floor(minutes / 60);
     const remainingMinutes = Math.round(minutes % 60);
 
     if (hours === 0) {
-        return `${remainingMinutes} minuti`;
+        return `${remainingMinutes} minutes`;
     }
 
     return `${hours} h ${remainingMinutes} min`;
@@ -41,25 +41,25 @@ async function main() {
     const profile = await resolveProfile();
     const expiry = await getSsoSessionExpiry(profile);
 
-    console.log(`Profilo AWS: ${profile}`);
+    console.log(`AWS profile: ${profile}`);
 
     if (!expiry) {
-        console.log('Sessione SSO: non trovata in cache (esegui aws sso login)');
+        console.log('SSO session: not found in cache (run aws sso login)');
         process.exitCode = 1;
         return;
     }
 
     const minutesRemaining = (expiry.getTime() - Date.now()) / 60000;
-    console.log(`Sessione SSO scade: ${expiry.toISOString()}`);
-    console.log(`Tempo rimanente: ${formatDuration(minutesRemaining)}`);
+    console.log(`SSO session expires: ${expiry.toISOString()}`);
+    console.log(`Time remaining: ${formatDuration(minutesRemaining)}`);
 
     if (minutesRemaining <= 0) {
-        console.log(`Azione: aws sso login --profile ${profile}`);
+        console.log(`Action: aws sso login --profile ${profile}`);
         process.exitCode = 1;
     }
 }
 
 main().catch(error => {
-    console.error('Errore check sessione SSO:', error.message);
+    console.error('SSO session check error:', error.message);
     process.exit(1);
 });

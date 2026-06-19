@@ -1,79 +1,79 @@
 #!/bin/bash
 
-echo "🔐 Setup AWS SSO per CloudWatch Log Downloader"
+echo "🔐 AWS SSO setup for CloudWatch Log Downloader"
 echo "================================================"
 
-# Verifica se AWS CLI è installato
+# Check AWS CLI
 if ! command -v aws &> /dev/null; then
-    echo "❌ AWS CLI non trovato. Installa AWS CLI v2 prima di continuare."
-    echo "   Su Endeavour OS: yay -S aws-cli-v2"
-    echo "   Su altre distribuzioni: ./install-aws-cli-endeavour.sh"
+    echo "❌ AWS CLI not found. Install AWS CLI v2 before continuing."
+    echo "   On Endeavour OS: yay -S aws-cli-v2"
+    echo "   On other distributions: ./install-aws-cli-endeavour.sh"
     exit 1
 fi
 
-# Verifica versione AWS CLI
+# Check AWS CLI version
 AWS_VERSION=$(aws --version 2>&1 | cut -d/ -f2 | cut -d' ' -f1 | cut -d. -f1)
 if [ "$AWS_VERSION" -lt 2 ]; then
-    echo "❌ AWS CLI v1 trovato. È richiesta la versione 2 per il supporto SSO."
-    echo "   Aggiorna a AWS CLI v2"
+    echo "❌ AWS CLI v1 found. Version 2 is required for SSO support."
+    echo "   Upgrade to AWS CLI v2"
     exit 1
 fi
 
-echo "✅ AWS CLI v2 trovato"
+echo "✅ AWS CLI v2 found"
 
-# Configura SSO
+# Configure SSO
 echo ""
-echo "📝 Configurazione AWS SSO"
-echo "Hai bisogno delle seguenti informazioni dal tuo team IT:"
-echo "  - SSO Start URL (es: https://your-company.awsapps.com/start)"
-echo "  - SSO Region (es: eu-west-1)"
-echo "  - Account ID AWS"
-echo "  - Nome del ruolo (es: PowerUserAccess)"
+echo "📝 AWS SSO configuration"
+echo "You will need the following information from your IT team:"
+echo "  - SSO Start URL (e.g. https://your-company.awsapps.com/start)"
+echo "  - SSO Region (e.g. eu-west-1)"
+echo "  - AWS Account ID"
+echo "  - Role name (e.g. PowerUserAccess)"
 echo ""
 
-read -p "Vuoi configurare AWS SSO ora? (y/n): " -n 1 -r
+read -p "Configure AWS SSO now? (y/n): " -n 1 -r
 echo
 if [[ $REPLY =~ ^[Yy]$ ]]; then
     aws configure sso --profile my-sso-profile
 
     if [ $? -eq 0 ]; then
-        echo "✅ Configurazione SSO completata!"
+        echo "✅ SSO configuration complete!"
 
         # Test login
         echo ""
-        echo "🔐 Test login SSO..."
+        echo "🔐 Testing SSO login..."
         aws sso login --profile my-sso-profile
 
         if [ $? -eq 0 ]; then
-            echo "✅ Login SSO riuscito!"
+            echo "✅ SSO login successful!"
 
-            # Verifica identità
+            # Verify identity
             echo ""
-            echo "🔍 Verifica identità AWS:"
+            echo "🔍 AWS identity:"
             aws sts get-caller-identity --profile my-sso-profile
 
             echo ""
-            echo "🎉 Setup completato! Ora:"
-            echo "  1. Copia config.sample.json in config.uat.json o config.prod.json"
-            echo "  2. Personalizza profile AWS e logGroups"
-            echo "  2. npm install"
-            echo "  3. npm start"
+            echo "🎉 Setup complete! Next steps:"
+            echo "  1. Copy config.sample.json to config.uat.json or config.prod.json"
+            echo "  2. Customize AWS profile and logGroups"
+            echo "  3. npm install"
+            echo "  4. npm start"
             echo ""
-            echo "💡 Per rinnovare il token: aws sso login --profile my-sso-profile"
+            echo "💡 To renew the token: aws sso login --profile my-sso-profile"
 
         else
-            echo "❌ Login SSO fallito. Verifica la configurazione."
+            echo "❌ SSO login failed. Check your configuration."
             exit 1
         fi
     else
-        echo "❌ Configurazione SSO fallita."
+        echo "❌ SSO configuration failed."
         exit 1
     fi
 else
     echo ""
-    echo "ℹ️ Configura manualmente con:"
+    echo "ℹ️ Configure manually with:"
     echo "   aws configure sso --profile my-sso-profile"
 fi
 
 echo ""
-echo "📚 Documentazione: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sso.html"
+echo "📚 Documentation: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sso.html"

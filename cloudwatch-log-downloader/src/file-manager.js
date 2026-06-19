@@ -20,7 +20,7 @@ class FileManager {
             await fs.ensureDir(this.logDirectory);
             this.logger.debug(`Directory log assicurata: ${this.logDirectory}`);
         } catch (error) {
-            this.logger.error('Errore nella creazione della directory log:', error.message);
+            this.logger.error('Error creating log directory:', error.message);
             throw error;
         }
     }
@@ -37,7 +37,7 @@ class FileManager {
     /*
     async writeLogsToFile(events) {
         if (!events || events.length === 0) {
-            this.logger.debug('Nessun evento log da scrivere');
+            this.logger.debug('No log events to write');
             return;
         }
 
@@ -53,10 +53,10 @@ class FileManager {
 
             await fs.appendFile(filePath, logLines + '\n');
 
-            this.logger.info(`Scritti ${events.length} log nel file: ${path.basename(filePath)}`);
+            this.logger.info(`Wrote ${events.length} logs to file: ${path.basename(filePath)}`);
 
         } catch (error) {
-            this.logger.error('Errore nella scrittura del file log:', {
+            this.logger.error('Error writing log file:', {
                 message: error.message,
                 stack: error.stack
             });
@@ -134,7 +134,7 @@ class FileManager {
             }
             containerName = logObject.kubernetes?.container_name || null;
         } catch (e) {
-            // messaggio non JSON: usa raw
+            // non-JSON message: use raw payload
         }
 
         return { logStreamName, logGroupName, containerName, body };
@@ -142,7 +142,7 @@ class FileManager {
 
     async writeLogsToFile(events) {
         if (!events || events.length === 0) {
-            this.logger.debug('Nessun evento log da scrivere');
+            this.logger.debug('No log events to write');
             return;
         }
 
@@ -172,20 +172,20 @@ class FileManager {
             }
 
             if (lines.length === 0) {
-                this.logger.debug('Nessuna riga dopo filtro monitorPatterns');
+                this.logger.debug('No lines after monitorPatterns filter');
                 return;
             }
 
             await fs.appendFile(filePath, lines.join('\n') + '\n');
-            this.logger.info(`Scritti ${lines.length} log nel file: ${path.basename(filePath)}`);
+            this.logger.info(`Wrote ${lines.length} logs to file: ${path.basename(filePath)}`);
 
             if (exceptionLines.length > 0) {
                 await fs.appendFile(exceptionFilePath, exceptionLines.join('\n') + '\n');
-                this.logger.info(`Scritte ${exceptionLines.length} eccezioni in: ${path.basename(exceptionFilePath)}`);
+                this.logger.info(`Wrote ${exceptionLines.length} exceptions to: ${path.basename(exceptionFilePath)}`);
             }
 
         } catch (error) {
-            this.logger.error('Errore nella scrittura del file log:', {
+            this.logger.error('Error writing log file:', {
                 message: error.message,
                 stack: error.stack
             });
@@ -220,20 +220,20 @@ class FileManager {
                 if (fileTime.isBefore(cutoffTime)) {
                     await fs.remove(filePath);
                     deletedCount++;
-                    this.logger.debug(`File eliminato: ${file}`);
+                    this.logger.debug(`Deleted file: ${file}`);
                 }
             }
 
             if (deletedCount > 0) {
-                this.logger.info(`Cleanup completato: eliminati ${deletedCount} file vecchi`);
+                this.logger.info(`Cleanup complete: deleted ${deletedCount} old files`);
             }
 
             if (preservedCount > 0) {
-                this.logger.info(`Cleanup: ${preservedCount} file eccezioni/coppie conservati`);
+                this.logger.info(`Cleanup: preserved ${preservedCount} exception/pair files`);
             }
 
         } catch (error) {
-            this.logger.error('Errore durante il cleanup dei file:', error.message);
+            this.logger.error('File cleanup error:', error.message);
         }
     }
 
@@ -259,7 +259,7 @@ class FileManager {
             return fileDetails.sort((a, b) => b.created - a.created);
 
         } catch (error) {
-            this.logger.error('Errore nel recupero della lista file:', error.message);
+            this.logger.error('Error listing files:', error.message);
             return [];
         }
     }

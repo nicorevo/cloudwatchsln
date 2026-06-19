@@ -27,9 +27,9 @@ class MonitorServer {
         await new Promise((resolve, reject) => {
             this.server = http.createServer((req, res) => {
                 this.handleRequest(req, res).catch(error => {
-                    this.logger.error('Errore request monitor:', error.message);
+                    this.logger.error('Monitor request error:', error.message);
                     this.sendJson(res, 500, {
-                        error: 'Errore interno del monitor',
+                        error: 'Internal monitor error',
                         code: 'INTERNAL_ERROR'
                     });
                 });
@@ -37,7 +37,7 @@ class MonitorServer {
 
             this.server.on('error', reject);
             this.server.listen(this.config.port, this.config.host, () => {
-                this.logger.info('Monitor eccezioni avviato', {
+                this.logger.info('Exception monitor started', {
                     url: `http://${this.config.host}:${this.config.port}`
                 });
                 resolve();
@@ -62,7 +62,7 @@ class MonitorServer {
 
         if (req.method !== 'GET') {
             return this.sendJson(res, 405, {
-                error: 'Metodo non supportato',
+                error: 'Method not allowed',
                 code: 'METHOD_NOT_ALLOWED'
             });
         }
@@ -91,7 +91,7 @@ class MonitorServer {
         }
 
         return this.sendJson(res, 404, {
-            error: 'Risorsa non trovata',
+            error: 'Resource not found',
             code: 'NOT_FOUND'
         });
     }
@@ -152,7 +152,7 @@ class MonitorServer {
 
         if (!await fs.pathExists(normalizedFilePath)) {
             return this.sendJson(res, 404, {
-                error: 'Risorsa non trovata',
+                error: 'Resource not found',
                 code: 'NOT_FOUND'
             });
         }

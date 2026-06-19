@@ -22,7 +22,7 @@ function isTokenError(error) {
 }
 
 function buildSsoExpiredError(profile) {
-    return new Error(`Token SSO scaduto. Esegui: aws sso login --profile ${profile}`);
+    return new Error(`SSO token expired. Run: aws sso login --profile ${profile}`);
 }
 
 function parseIniSections(content) {
@@ -97,7 +97,7 @@ async function readSsoCacheEntries(cacheDirectory) {
                 entries.push(content);
             }
         } catch {
-            // Ignora file cache non validi
+            // Ignore invalid cache files
         }
     }
 
@@ -144,7 +144,7 @@ function runAwsSsoLogin(profileName) {
                 return;
             }
 
-            reject(new Error(`Login SSO fallito (exit code ${code})`));
+            reject(new Error(`SSO login failed (exit code ${code})`));
         });
     });
 }
@@ -173,7 +173,7 @@ class AwsAuthManager {
         try {
             return fromSSO({ profile: this.profile });
         } catch (error) {
-            this.logger.warn('SSO non disponibile, uso fromIni:', error.message);
+            this.logger.warn('SSO unavailable, falling back to fromIni:', error.message);
             return fromIni({ profile: this.profile });
         }
     }
@@ -192,7 +192,7 @@ class AwsAuthManager {
             return false;
         }
 
-        this.logger.info(`Avvio login SSO per profilo ${this.profile}...`);
+        this.logger.info(`Starting SSO login for profile ${this.profile}...`);
         await this.runLoginFn(this.profile);
         return true;
     }
@@ -207,7 +207,7 @@ class AwsAuthManager {
 
         this.credentialProvider = this.createCredentialProviderFn();
         if (!this.credentialProvider) {
-            throw new Error('Profilo AWS non configurato');
+            throw new Error('AWS profile not configured');
         }
 
         try {
@@ -232,7 +232,7 @@ class AwsAuthManager {
             ssoSessionExpiresAt
         };
 
-        this.logger.info('Autenticazione AWS completata', {
+        this.logger.info('AWS authentication complete', {
             profile: result.profile,
             account: result.account,
             credentialExpiration: result.credentialExpiration
@@ -248,7 +248,7 @@ class AwsAuthManager {
             const minutesRemaining = (result.ssoSessionExpiresAt.getTime() - Date.now()) / 60000;
 
             if (minutesRemaining <= warningMinutes) {
-                this.logger.warn('Sessione SSO in scadenza imminente', {
+                this.logger.warn('SSO session expiring soon', {
                     ssoSessionExpiresAt: result.ssoSessionExpiresAt.toISOString(),
                     minutesRemaining: Math.max(0, Math.round(minutesRemaining)),
                     hint: `aws sso login --profile ${this.profile}`
@@ -261,12 +261,12 @@ class AwsAuthManager {
 
     async refreshCredentials() {
         if (!this.credentialProvider) {
-            throw new Error('Autenticazione AWS non inizializzata');
+            throw new Error('AWS authentication not initialized');
         }
 
         try {
             this.lastCredentials = await this.credentialProvider();
-            this.logger.info('Credenziali AWS rinnovate', {
+            this.logger.info('AWS credentials refreshed', {
                 profile: this.profile,
                 expiration: this.lastCredentials.expiration
                     ? this.lastCredentials.expiration.toISOString()

@@ -25,7 +25,7 @@ class ExceptionContext {
     async resolveExceptionContext(exceptionId) {
         const parsedId = parseExceptionId(exceptionId);
         if (!parsedId) {
-            const error = new Error('ID eccezione non valido');
+            const error = new Error('Invalid exception ID');
             error.code = 'INVALID_ID';
             throw error;
         }
@@ -34,7 +34,7 @@ class ExceptionContext {
         const exceptionPath = resolveSafeLogPath(this.logDirectory, exceptionFilename);
 
         if (!exceptionPath || !await fs.pathExists(exceptionPath)) {
-            const error = new Error('File eccezione non trovato');
+            const error = new Error('Exception file not found');
             error.code = 'NOT_FOUND';
             throw error;
         }
@@ -44,7 +44,7 @@ class ExceptionContext {
 
         const lineIndex = parsedId.indexInFile - 1;
         if (lineIndex < 0 || lineIndex >= exceptionLines.length) {
-            const error = new Error('Eccezione non trovata nel file');
+            const error = new Error('Exception not found in file');
             error.code = 'NOT_FOUND';
             throw error;
         }

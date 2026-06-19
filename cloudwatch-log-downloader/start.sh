@@ -1,40 +1,40 @@
 #!/bin/bash
 
-echo "🚀 Avvio CloudWatch Log Downloader..."
+echo "🚀 Starting CloudWatch Log Downloader..."
 
-# Verifica Node.js
+# Check Node.js
 if ! command -v node &> /dev/null; then
-    echo "❌ Node.js non trovato. Installare Node.js prima di continuare."
+    echo "❌ Node.js not found. Install Node.js before continuing."
     exit 1
 fi
 
-# Verifica npm
+# Check npm
 if ! command -v npm &> /dev/null; then
-    echo "❌ npm non trovato."
+    echo "❌ npm not found."
     exit 1
 fi
 
-# Installa dipendenze se necessario
+# Install dependencies if needed
 if [ ! -d "node_modules" ]; then
-    echo "📦 Installazione dipendenze..."
+    echo "📦 Installing dependencies..."
     npm install
 fi
 
-# Verifica config
+# Check config
 CONFIG_ENV="${CONFIG_ENV:-uat}"
 CONFIG_FILE="config.${CONFIG_ENV}.json"
 
 if [ ! -f "$CONFIG_FILE" ]; then
-    echo "❌ $CONFIG_FILE non trovato."
-    echo "   Copia config.sample.json in $CONFIG_FILE e personalizza i valori."
+    echo "❌ $CONFIG_FILE not found."
+    echo "   Copy config.sample.json to $CONFIG_FILE and customize the values."
     exit 1
 fi
 
-# Verifica AWS CLI
+# Check AWS CLI
 if ! command -v aws &> /dev/null; then
-    echo "⚠️  AWS CLI non trovato. Potrebbe essere necessario per SSO."
-    echo "   Su Endeavour OS: yay -S aws-cli-v2"
-    echo "   Continuare comunque? (y/n)"
+    echo "⚠️  AWS CLI not found. It may be required for SSO."
+    echo "   On Endeavour OS: yay -S aws-cli-v2"
+    echo "   Continue anyway? (y/n)"
     read -n 1 -r
     echo
     if [[ ! $REPLY =~ ^[Yy]$ ]]; then
@@ -42,12 +42,12 @@ if ! command -v aws &> /dev/null; then
     fi
 fi
 
-echo "✅ Avvio del servizio..."
+echo "✅ Starting service..."
 
 AWS_PROFILE=$(node -pe "require('./${CONFIG_FILE}').aws.profile")
 
 if [ -n "$AWS_PROFILE" ]; then
-    echo "Profilo AWS: $AWS_PROFILE"
+    echo "AWS profile: $AWS_PROFILE"
     aws sso login --profile "$AWS_PROFILE"
     aws sts get-caller-identity --profile "$AWS_PROFILE"
 fi

@@ -1,8 +1,8 @@
 # CloudWatch Log Downloader
 
-**Scarica log da AWS CloudWatch in file locali**, con rolling automatico, estrazione eccezioni e **Exception Monitor** — un'interfaccia web per navigare errori e contesto.
+**Download AWS CloudWatch logs to local files**, with automatic rolling, exception extraction, and an **Exception Monitor** — a web UI to browse errors and surrounding context.
 
-Pensato per team che vogliono **osservare microservizi in UAT/prod** senza passare dalla console AWS: grep, script, AI o debug offline su file testuali.
+Built for teams who want to **observe microservices in UAT/prod** without the AWS Console: grep, scripts, offline debugging, or optional AI-assisted pattern tuning on plain-text files.
 
 ```
   AWS CloudWatch (logGroups[])
@@ -11,48 +11,48 @@ Pensato per team che vogliono **osservare microservizi in UAT/prod** senza passa
   cloudwatch-log-downloader  ──►  ./logs/my-app_2026-06-19_12-00.log
            │                      ./logs/my-app-exceptions_2026-06-19_12-00.log
            ▼
-  http://127.0.0.1:3847  (albero eccezioni + contesto ±10 righe)
+  http://127.0.0.1:3847  (exception tree + ±10 line context)
 ```
 
 ---
 
-## Funzionalità
+## Features
 
-| Funzione | Descrizione |
-|----------|-------------|
-| **Download schedulato** | Polling CloudWatch con cron configurabile |
-| **Multi log group** | Un array `logGroups[]` — tipico EKS: un path per pod/deployment |
-| **File rolling** | Un file al minuto (configurabile), append nello stesso minuto |
-| **Eccezioni** | Pattern configurabili → file `-exceptions_*.log` dedicati |
-| **Retention** | Cleanup automatico; opzione `preserveExceptionPairs` per tenere coppie eccezione/main |
-| **AWS SSO** | Auth all'avvio + refresh credenziali STS ogni ~55 min |
-| **Exception Monitor** | UI locale + API REST JSON (`/api/v1/...`) |
+| Feature | Description |
+|---------|-------------|
+| **Scheduled download** | CloudWatch polling with configurable cron |
+| **Multi log group** | A `logGroups[]` array — typical on EKS: one path per pod/deployment |
+| **Rolling files** | One file per minute (configurable), append within the same minute |
+| **Exceptions** | Configurable patterns → dedicated `-exceptions_*.log` files |
+| **Retention** | Automatic cleanup; `preserveExceptionPairs` keeps exception/main pairs |
+| **AWS SSO** | Auth at startup + STS credential refresh every ~55 min |
+| **Exception Monitor** | Local UI + JSON REST API (`/api/v1/...`) |
 
 ---
 
 ## Quick start
 
-### 1. Prerequisiti
+### 1. Prerequisites
 
 - **Node.js 16+**
-- **AWS CLI v2** con [IAM Identity Center (SSO)](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sso.html) configurato
+- **AWS CLI v2** with [IAM Identity Center (SSO)](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sso.html) configured
 
 ```bash
 cd cloudwatch-log-downloader
 npm install
 ```
 
-### 2. Configurazione
+### 2. Configuration
 
-Copia il template e personalizzalo:
+Copy the template and customize it:
 
 ```bash
-cp config.sample.json config.prod.json   # o config.uat.json
+cp config.sample.json config.prod.json   # or config.uat.json
 ```
 
-I file `config.*.json` locali **non vanno committati** (sono in `.gitignore`). In repo resta solo `config.sample.json`.
+Local `config.*.json` files **must not be committed** (they are in `.gitignore`). Only `config.sample.json` is kept in the repo.
 
-Campi essenziali:
+Essential fields:
 
 ```json
 {
@@ -82,46 +82,46 @@ Campi essenziali:
 }
 ```
 
-| Campo | Cosa fa |
+| Field | Purpose |
 |-------|---------|
-| `logGroups[]` | Path CloudWatch da interrogare (preferito su EKS) |
-| `exceptionPatterns[]` | Sottostringhe che finiscono nel file `-exceptions_*` |
-| `filePrefix` | Prefisso nomi file in `./logs/` |
-| `monitor.enabled` | UI eccezioni su `http://127.0.0.1:3847` |
+| `logGroups[]` | CloudWatch paths to query (preferred on EKS) |
+| `exceptionPatterns[]` | Substrings copied into `-exceptions_*` files |
+| `filePrefix` | Filename prefix under `./logs/` |
+| `monitor.enabled` | Exception UI at `http://127.0.0.1:3847` |
 
-Altri campi utili in `config.sample.json`:
+Other useful fields in `config.sample.json`:
 
-| Sezione | Campo | Default | Descrizione |
+| Section | Field | Default | Description |
 |---------|-------|---------|-------------|
-| `aws` | `credentialRefreshIntervalMinutes` | `55` | Refresh proattivo credenziali STS |
-| `aws` | `loginOnStartupIfNeeded` | `false` | Apre browser SSO se sessione assente |
-| `cloudwatch` | `monitorPatterns` | `[]` | Vuoto = tutte le righe nel file main |
-| `files` | `preserveExceptionPairs` | `true` | Non cancella coppie eccezione/main |
-| `monitor` | `port` | `3847` | Porta Exception Monitor |
-| `schedule` | `downloadInterval` | `*/1 * * * *` | Cron download (Europe/Rome) |
+| `aws` | `credentialRefreshIntervalMinutes` | `55` | Proactive STS credential refresh |
+| `aws` | `loginOnStartupIfNeeded` | `false` | Opens SSO browser if session is missing |
+| `cloudwatch` | `monitorPatterns` | `[]` | Empty = all lines in the main file |
+| `files` | `preserveExceptionPairs` | `true` | Do not delete exception/main pairs |
+| `monitor` | `port` | `3847` | Exception Monitor port |
+| `schedule` | `downloadInterval` | `*/1 * * * *` | Download cron (Europe/Rome) |
 
-Scopri log group EKS:
+Discover EKS log groups:
 
 ```bash
 aws logs describe-log-groups --profile YOUR_AWS_PROFILE --log-group-name-prefix "/eks/"
 ```
 
-### 3. Login AWS e avvio
+### 3. AWS login and start
 
 ```bash
 aws sso login --profile my-aws-sso-profile
-npm run check-sso-expiry:prod    # opzionale: scadenza sessione SSO
+npm run check-sso-expiry:prod    # optional: SSO session expiry
 npm run start:prod
 ```
 
-Output atteso:
+Expected output:
 
 ```
-Console web:  http://127.0.0.1:3847/
-API REST:     http://127.0.0.1:3847/api/v1
+Web console:  http://127.0.0.1:3847/
+REST API:     http://127.0.0.1:3847/api/v1
 ```
 
-File generati:
+Generated files:
 
 ```
 logs/
@@ -132,22 +132,22 @@ logs/
 
 ---
 
-## Configurare i pattern di eccezione (con AI)
+## Configuring exception patterns (optional AI workflow)
 
-Il passo più importante per un nuovo progetto è popolare `exceptionPatterns[]`: stringhe che, se trovate in una riga di log, la copiano nel file eccezioni.
+The most important step for a new project is populating `exceptionPatterns[]`: strings that, when found in a log line, copy that line into the exceptions file.
 
-### Workflow consigliato
+### Recommended workflow
 
-1. **Avvia il downloader** con `exceptionPatterns` minimi (es. `" ERROR "`).
-2. **Raccogli log** per qualche minuto in `./logs/`.
-3. **Passa il sorgente dell'applicazione a un AI** (Cursor, Claude, ChatGPT) con un prompt del tipo:
+1. **Start the downloader** with minimal `exceptionPatterns` (e.g. `" ERROR "`).
+2. **Collect logs** for a few minutes in `./logs/`.
+3. **Optionally pass application source to an AI assistant** with a prompt like:
 
-   > Analizza questo codice e produci un elenco di pattern di log da usare in `exceptionPatterns` di un downloader CloudWatch. Includi messaggi ERROR esatti, prefissi di logger, stack trace Python/Java, e classifica per priorità P0–P3.
+   > Analyze this code and produce a list of log patterns for `exceptionPatterns` in a CloudWatch downloader. Include exact ERROR messages, logger prefixes, Python/Java stack traces, and classify by priority P0–P3.
 
-4. **Incolla i pattern** in `config.prod.json` → riavvia il servizio.
-5. **Verifica** in `./logs/*-exceptions_*.log` e nella UI su `:3847`.
+4. **Paste the patterns** into `config.prod.json` → restart the service.
+5. **Verify** in `./logs/*-exceptions_*.log` and in the UI on `:3847`.
 
-Pattern generici di partenza:
+Generic starter patterns:
 
 ```json
 "exceptionPatterns": [
@@ -163,47 +163,47 @@ Pattern generici di partenza:
 
 ## Exception Monitor
 
-Con `monitor.enabled: true` (default nel sample):
+With `monitor.enabled: true` (default in the sample):
 
-| URL | Descrizione |
+| URL | Description |
 |-----|-------------|
-| `http://127.0.0.1:3847/` | Albero eccezioni + pannello contesto |
-| `GET /api/v1/exceptions/tree` | JSON albero file → eccezioni |
-| `GET /api/v1/exceptions/:id` | Eccezione + righe before/after dal file main |
-| `GET /api/v1/health` | Stato monitor |
+| `http://127.0.0.1:3847/` | Exception tree + context panel |
+| `GET /api/v1/exceptions/tree` | JSON tree: files → exceptions |
+| `GET /api/v1/exceptions/:id` | Exception + before/after lines from main file |
+| `GET /api/v1/health` | Monitor status |
 
-Disabilitare: `"monitor": { "enabled": false }`.
+Disable with: `"monitor": { "enabled": false }`.
 
 ---
 
-## Script npm
+## npm scripts
 
-| Comando | Azione |
+| Command | Action |
 |---------|--------|
-| `npm run start:prod` | Avvio con `config.prod.json` |
-| `npm run start:uat` | Avvio con `config.uat.json` |
-| `npm run check-sso-expiry:prod` | Scadenza sessione SSO portal |
-| `npm test` | Test automatizzati |
+| `npm run start:prod` | Start with `config.prod.json` |
+| `npm run start:uat` | Start with `config.uat.json` |
+| `npm run check-sso-expiry:prod` | SSO portal session expiry |
+| `npm test` | Automated tests |
 
-Setup SSO iniziale: `cloudwatch-log-downloader/setup-sso.sh`
+Initial SSO setup: `cloudwatch-log-downloader/setup-sso.sh`
 
-**Sessione SSO:** le credenziali STS si rinnovano automaticamente ogni ~55 min; la sessione portal (browser) va rinnovata con `aws sso login` quando scade.
+**SSO session:** STS credentials renew automatically every ~55 min; renew the portal (browser) session with `aws sso login` when it expires.
 
 ---
 
-## Architettura
+## Architecture
 
 ```
 cloudwatch-log-downloader/
 ├── src/
-│   ├── index.js                 # Orchestrazione, cron, auth
-│   ├── aws-auth-manager.js      # SSO + refresh STS
+│   ├── index.js                 # Orchestration, cron, auth
+│   ├── aws-auth-manager.js      # SSO + STS refresh
 │   ├── cloudwatch-client.js     # FilterLogEvents
-│   ├── file-manager.js          # Rolling + eccezioni + retention
-│   └── monitor/                 # HTTP server + UI eccezioni
-├── public/                      # Frontend Exception Monitor
-├── config.sample.json           # Template committato
-├── config.prod.json             # Locale (gitignored)
+│   ├── file-manager.js          # Rolling + exceptions + retention
+│   └── monitor/                 # HTTP server + exception UI
+├── public/                      # Exception Monitor frontend
+├── config.sample.json           # Committed template
+├── config.prod.json             # Local (gitignored)
 └── tests/
 ```
 
@@ -211,19 +211,19 @@ cloudwatch-log-downloader/
 
 ## Troubleshooting
 
-**Token SSO scaduto**
+**Expired SSO token**
 
 ```bash
 aws sso login --profile my-aws-sso-profile
 npm run start:prod
 ```
 
-**0 eventi scaricati** — verificare `logGroups[]`, regione e profilo AWS in CloudWatch Console.
+**0 events downloaded** — check `logGroups[]`, region, and AWS profile in the CloudWatch Console.
 
-**BrokenPipeError durante `aws sso login`** — spesso innocuo; controllare con `aws sts get-caller-identity --profile ...`.
+**BrokenPipeError during `aws sso login`** — often harmless; verify with `aws sts get-caller-identity --profile ...`.
 
 ---
 
-## Licenza
+## License
 
-Apache-2.0 — vedi [LICENSE](LICENSE).
+Apache-2.0 — see [LICENSE](LICENSE).
