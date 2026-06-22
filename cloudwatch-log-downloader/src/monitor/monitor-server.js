@@ -5,15 +5,18 @@ const { URL } = require('url');
 
 const ExceptionIndex = require('./exception-index');
 const ExceptionContext = require('./exception-context');
+const ProjectMetrics = require('./project-metrics');
 
 const LEGACY_GONE_HINT = 'Usa GET /api/v1/projects/{project}/exceptions/tree';
+const DASHBOARD_TIMEZONE = 'Europe/Rome';
 
 class MonitorServer {
-    constructor(config, logger, projects) {
+    constructor(config, logger, projects, options = {}) {
         this.config = config;
         this.logger = logger;
         this.publicDirectory = path.join(__dirname, '..', '..', 'public');
         this.server = null;
+        this.nowProvider = options.nowProvider || (() => new Date());
         this.projects = this.buildProjectRegistry(projects);
     }
 
@@ -29,6 +32,10 @@ class MonitorServer {
                     || path.basename(projectConfig.logDirectory),
                 exceptionIndex: new ExceptionIndex(
                     this.config,
+                    projectConfig.filePrefix,
+                    projectConfig.logDirectory
+                ),
+                projectMetrics: new ProjectMetrics(
                     projectConfig.filePrefix,
                     projectConfig.logDirectory
                 ),
@@ -94,6 +101,10 @@ class MonitorServer {
                 error: 'Method not allowed',
                 code: 'METHOD_NOT_ALLOWED'
             });
+        }
+
+        if (pathname === '/api/v1/dashboard') {
+            return this.handleDashboard(res);
         }
 
         if (pathname === '/api/v1/projects') {
@@ -173,6 +184,91 @@ class MonitorServer {
                 logDirectory: project.logDirectoryDisplay
             }))
         });
+    }
+
+    async handleDashboard(res) {
+        const now = this.nowProvider();
+        const projects = await Promise.all(
+            [...this.projects.values()].map(async project => {
+                try {
+                    const metrics = await project.projectMetrics.calculate({
+                        now,
+                        timezone: DASHBOARD_TIMEZONE
+                    });
+
+                    return {
+                        id: project.project,
+                        status: this.resolveDashboardStatus(metrics),
+                        metrics
+                    };
+                } catch (error) {
+                    this.logger.error('Metriche progetto non disponibili:', {
+                        project: project.project,
+                        message: error.message
+                    });
+
+                    return {
+                        id: project.project,
+                        status: 'error',
+                        metrics: null,
+                        error: {
+                            code: 'PROJECT_METRICS_UNAVAILABLE',
+                            message: 'Metriche progetto non disponibili'
+                        }
+                    };
+                }
+            })
+        );
+
+        projects.sort((left, right) => this.compareDashboardProjects(left, right));
+
+        return this.sendJson(res, 200, {
+            generatedAt: now.toISOString(),
+            timezone: DASHBOARD_TIMEZONE,
+            refreshSeconds: this.config.treeRefreshSeconds,
+            projectCount: projects.length,
+            projects
+        });
+    }
+
+    resolveDashboardStatus(metrics) {
+        if (metrics.lastHourExceptionCount > 0) {
+            return 'active';
+        }
+
+        if (metrics.todayExceptionCount > 0) {
+            return 'recent';
+        }
+
+        return 'inactive';
+    }
+
+    compareDashboardProjects(left, right) {
+        if (left.status === 'error' && right.status !== 'error') {
+            return 1;
+        }
+
+        if (right.status === 'error' && left.status !== 'error') {
+            return -1;
+        }
+
+        const leftActive = left.metrics?.lastHourExceptionCount > 0 ? 1 : 0;
+        const rightActive = right.metrics?.lastHourExceptionCount > 0 ? 1 : 0;
+        if (leftActive !== rightActive) {
+            return rightActive - leftActive;
+        }
+
+        const leftLatest = left.metrics?.latestExceptionAt
+            ? Date.parse(left.metrics.latestExceptionAt)
+            : Number.NEGATIVE_INFINITY;
+        const rightLatest = right.metrics?.latestExceptionAt
+            ? Date.parse(right.metrics.latestExceptionAt)
+            : Number.NEGATIVE_INFINITY;
+        if (leftLatest !== rightLatest) {
+            return rightLatest - leftLatest;
+        }
+
+        return left.id.localeCompare(right.id);
     }
 
     async handleGlobalHealth(res) {

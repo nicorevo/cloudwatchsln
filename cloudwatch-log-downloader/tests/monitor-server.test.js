@@ -1,6 +1,8 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('fs-extra');
 const http = require('http');
+const os = require('os');
 const path = require('path');
 
 const MonitorServer = require('../src/monitor/monitor-server');
@@ -89,6 +91,130 @@ test('monitor server espone health globale aggregato', async () => {
         assert.equal(health.projects[0].exceptionFileCount, 2);
     } finally {
         await server.stop();
+    }
+});
+
+test('monitor server espone dashboard aggregata ordinata per attività recente', async () => {
+    const logDirectory = await fs.mkdtemp(path.join(os.tmpdir(), 'monitor-dashboard-'));
+    const now = new Date('2026-06-22T12:00:00.000Z');
+
+    await fs.writeFile(
+        path.join(logDirectory, 'active-service-exceptions_recent.log'),
+        [
+            '[2026-06-22T11:30:00.000Z] [/eks/example | worker] ERROR recent',
+            '[2026-06-22T09:00:00.000Z] [/eks/example | worker] ERROR older'
+        ].join('\n')
+    );
+    await fs.writeFile(
+        path.join(logDirectory, 'recent-service-exceptions_today.log'),
+        '[2026-06-22T10:00:00.000Z] [/eks/example | api] ERROR today'
+    );
+
+    const server = new MonitorServer(MONITOR_CONFIG, logger, [
+        {
+            project: 'recent-service',
+            filePrefix: 'recent-service',
+            logDirectory,
+            logDirectoryDisplay: './logs'
+        },
+        {
+            project: 'empty-service',
+            filePrefix: 'empty-service',
+            logDirectory,
+            logDirectoryDisplay: './logs'
+        },
+        {
+            project: 'active-service',
+            filePrefix: 'active-service',
+            logDirectory,
+            logDirectoryDisplay: './logs'
+        }
+    ], {
+        nowProvider: () => now
+    });
+    await server.start();
+    const baseUrl = `http://127.0.0.1:${server.server.address().port}`;
+
+    try {
+        const dashboard = await requestJson(`${baseUrl}/api/v1/dashboard`);
+
+        assert.equal(dashboard.timezone, 'Europe/Rome');
+        assert.equal(dashboard.refreshSeconds, 30);
+        assert.equal(dashboard.projectCount, 3);
+        assert.deepEqual(
+            dashboard.projects.map(project => project.id),
+            ['active-service', 'recent-service', 'empty-service']
+        );
+
+        assert.deepEqual(dashboard.projects[0], {
+            id: 'active-service',
+            status: 'active',
+            metrics: {
+                retainedExceptionCount: 2,
+                lastHourExceptionCount: 1,
+                todayExceptionCount: 2,
+                exceptionFileCount: 1,
+                latestExceptionAt: '2026-06-22T11:30:00.000Z'
+            }
+        });
+        assert.equal(dashboard.projects[1].status, 'recent');
+        assert.equal(dashboard.projects[2].status, 'inactive');
+    } finally {
+        await server.stop();
+        await fs.remove(logDirectory);
+    }
+});
+
+test('monitor server isola errore metriche di un progetto', async () => {
+    const logDirectory = await fs.mkdtemp(path.join(os.tmpdir(), 'monitor-dashboard-ok-'));
+    const missingDirectory = path.join(logDirectory, 'missing');
+    const server = new MonitorServer(MONITOR_CONFIG, logger, [
+        {
+            project: 'healthy-service',
+            filePrefix: 'healthy-service',
+            logDirectory,
+            logDirectoryDisplay: './logs'
+        },
+        {
+            project: 'broken-service',
+            filePrefix: 'broken-service',
+            logDirectory: missingDirectory,
+            logDirectoryDisplay: './missing'
+        }
+    ], {
+        nowProvider: () => new Date('2026-06-22T12:00:00.000Z')
+    });
+    await server.start();
+    const baseUrl = `http://127.0.0.1:${server.server.address().port}`;
+
+    try {
+        const response = await request(`${baseUrl}/api/v1/dashboard`);
+
+        assert.equal(response.statusCode, 200);
+        assert.equal(response.body.projects.length, 2);
+        assert.deepEqual(response.body.projects[0], {
+            id: 'healthy-service',
+            status: 'inactive',
+            metrics: {
+                retainedExceptionCount: 0,
+                lastHourExceptionCount: 0,
+                todayExceptionCount: 0,
+                exceptionFileCount: 0,
+                latestExceptionAt: null
+            }
+        });
+        assert.deepEqual(response.body.projects[1], {
+            id: 'broken-service',
+            status: 'error',
+            metrics: null,
+            error: {
+                code: 'PROJECT_METRICS_UNAVAILABLE',
+                message: 'Metriche progetto non disponibili'
+            }
+        });
+    } finally {
+        await server.stop();
+        await fs.remove(logDirectory);
     }
 });
 
