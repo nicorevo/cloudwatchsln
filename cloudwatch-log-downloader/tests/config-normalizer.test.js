@@ -22,7 +22,7 @@ const BASE_MONITOR = {
 function legacyConfig(overrides = {}) {
     return {
         environment: 'prod',
-        project: 'download-mail',
+        project: 'prj01',
         aws: BASE_AWS,
         monitor: BASE_MONITOR,
         cloudwatch: {
@@ -39,7 +39,7 @@ function legacyConfig(overrides = {}) {
         files: {
             logDirectory: './logs',
             retentionMinutes: 60,
-            filePrefix: 'download-mail-logs-prod',
+            filePrefix: 'prj01-logs-prod',
             preserveExceptionPairs: true
         },
         logging: {
@@ -74,7 +74,7 @@ function multiProjectEntry(project, overrides = {}) {
 }
 
 test('PROJECT_ID_PATTERN accetta slug kebab-case validi', () => {
-    assert.match('download-mail', PROJECT_ID_PATTERN);
+    assert.match('prj01', PROJECT_ID_PATTERN);
     assert.match('a1', PROJECT_ID_PATTERN);
     assert.doesNotMatch('Download-Mail', PROJECT_ID_PATTERN);
     assert.doesNotMatch('-bad', PROJECT_ID_PATTERN);
@@ -90,10 +90,10 @@ test('normalizeConfig migra config legacy monoprogetto in cloudwatch[]', () => {
     assert.equal(normalized.cloudwatch.length, 1);
 
     const entry = normalized.cloudwatch[0];
-    assert.equal(entry.project, 'download-mail');
+    assert.equal(entry.project, 'prj01');
     assert.deepEqual(entry.logGroups, ['/eks/ns/worker-prod']);
     assert.deepEqual(entry.exceptionPatterns, [' ERROR ']);
-    assert.equal(entry.files.filePrefix, 'download-mail-logs-prod');
+    assert.equal(entry.files.filePrefix, 'prj01-logs-prod');
     assert.equal(entry.schedule.downloadInterval, '*/1 * * * *');
     assert.equal(entry.logging.level, 'info');
 });
@@ -115,7 +115,7 @@ test('normalizeConfig normalizza cloudwatch[] multi-progetto', () => {
         aws: BASE_AWS,
         monitor: BASE_MONITOR,
         cloudwatch: [
-            multiProjectEntry('download-mail'),
+            multiProjectEntry('prj01'),
             multiProjectEntry('other-service', {
                 schedule: { downloadInterval: '*/2 * * * *', cleanupInterval: '0 */2 * * *' },
                 logging: { level: 'warn', enableConsole: false }
@@ -124,7 +124,7 @@ test('normalizeConfig normalizza cloudwatch[] multi-progetto', () => {
     });
 
     assert.equal(normalized.cloudwatch.length, 2);
-    assert.equal(normalized.cloudwatch[0].project, 'download-mail');
+    assert.equal(normalized.cloudwatch[0].project, 'prj01');
     assert.equal(normalized.cloudwatch[1].project, 'other-service');
     assert.equal(normalized.cloudwatch[1].schedule.downloadInterval, '*/2 * * * *');
     assert.equal(normalized.cloudwatch[1].logging.level, 'warn');
@@ -174,11 +174,11 @@ test('normalizeConfig rifiuta project duplicati', () => {
         () => normalizeConfig({
             aws: BASE_AWS,
             cloudwatch: [
-                multiProjectEntry('download-mail'),
-                multiProjectEntry('download-mail', { files: { filePrefix: 'other-prefix' } })
+                multiProjectEntry('prj01'),
+                multiProjectEntry('prj01', { files: { filePrefix: 'other-prefix' } })
             ]
         }),
-        /project duplicato: download-mail/
+        /project duplicato: prj01/
     );
 });
 
@@ -187,18 +187,18 @@ test('normalizeConfig rifiuta filePrefix duplicati', () => {
         () => normalizeConfig({
             aws: BASE_AWS,
             cloudwatch: [
-                multiProjectEntry('download-mail'),
-                multiProjectEntry('other-service', { files: { filePrefix: 'download-mail-logs-prod' } })
+                multiProjectEntry('prj01'),
+                multiProjectEntry('other-service', { files: { filePrefix: 'prj01-logs-prod' } })
             ]
         }),
-        /filePrefix duplicato: download-mail-logs-prod/
+        /filePrefix duplicato: prj01-logs-prod/
     );
 });
 
 test('normalizeConfig normalizza logging.level in minuscolo', () => {
     const normalized = normalizeConfig({
         aws: BASE_AWS,
-        cloudwatch: [multiProjectEntry('download-mail', {
+        cloudwatch: [multiProjectEntry('prj01', {
             logging: { level: 'DEBUG', enableConsole: true }
         })]
     });
@@ -270,7 +270,7 @@ test('normalizeConfig accetta config.sample.json multi-progetto', async () => {
     const normalized = normalizeConfig(sample);
 
     assert.equal(normalized.cloudwatch.length, 2);
-    assert.equal(normalized.cloudwatch[0].project, 'download-mail');
-    assert.equal(normalized.cloudwatch[1].project, 'os-sinistri');
+    assert.equal(normalized.cloudwatch[0].project, 'prj01');
+    assert.equal(normalized.cloudwatch[1].project, 'prj02');
     assert.ok(normalized.cloudwatch.every(entry => entry.files.filePrefix));
 });

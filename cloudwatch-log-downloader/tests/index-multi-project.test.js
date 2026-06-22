@@ -13,9 +13,9 @@ test('loadConfig normalizza config legacy monoprogetto', async () => {
     await downloader.loadConfig();
 
     assert.equal(downloader.config.cloudwatch.length, 1);
-    assert.equal(downloader.config.cloudwatch[0].project, 'download-mail');
+    assert.equal(downloader.config.cloudwatch[0].project, 'prj01');
     assert.deepEqual(downloader.config.cloudwatch[0].logGroups, ['/eks/ns/worker-prod']);
-    assert.equal(downloader.config.cloudwatch[0].files.filePrefix, 'download-mail-logs-prod');
+    assert.equal(downloader.config.cloudwatch[0].files.filePrefix, 'prj01-logs-prod');
     assert.equal(downloader.config.aws.region, 'eu-central-1');
     assert.equal(downloader.config.monitor.enabled, false);
 });
@@ -26,7 +26,7 @@ test('loadConfig accetta cloudwatch[] multi-progetto', async () => {
     await downloader.loadConfig();
 
     assert.equal(downloader.config.cloudwatch.length, 2);
-    assert.equal(downloader.config.cloudwatch[0].project, 'download-mail');
+    assert.equal(downloader.config.cloudwatch[0].project, 'prj01');
     assert.equal(downloader.config.cloudwatch[1].project, 'other-service');
     assert.equal(downloader.config.cloudwatch[1].schedule.downloadInterval, '*/2 * * * *');
 });
@@ -46,8 +46,8 @@ test('getMonitorProjectDescriptors restituisce un descriptor per runner', () => 
         {
             getMonitorDescriptor() {
                 return {
-                    project: 'download-mail',
-                    filePrefix: 'download-mail-logs-prod',
+                    project: 'prj01',
+                    filePrefix: 'prj01-logs-prod',
                     logDirectory: './logs'
                 };
             },
@@ -72,7 +72,7 @@ test('getMonitorProjectDescriptors restituisce un descriptor per runner', () => 
     const descriptors = downloader.getMonitorProjectDescriptors();
 
     assert.equal(descriptors.length, 2);
-    assert.equal(descriptors[0].project, 'download-mail');
+    assert.equal(descriptors[0].project, 'prj01');
     assert.equal(descriptors[1].filePrefix, 'other-service-logs-prod');
     assert.ok(descriptors[0].logDirectoryResolved.includes('logs'));
 });

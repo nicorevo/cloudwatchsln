@@ -1,6 +1,6 @@
 {
   "environment": "prod",
-  "project": "download-mail",
+  "project": "prj01",
   "aws": {
     "region": "eu-central-1",
     "profile": "test-profile"
@@ -19,7 +19,7 @@
   "files": {
     "logDirectory": "./logs",
     "retentionMinutes": 60,
-    "filePrefix": "download-mail-logs-prod",
+    "filePrefix": "prj01-logs-prod",
     "preserveExceptionPairs": true
   },
   "logging": {

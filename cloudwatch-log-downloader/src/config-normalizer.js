@@ -100,7 +100,7 @@ function validateProjectId(project) {
     }
 
     if (!PROJECT_ID_PATTERN.test(project)) {
-        throw new Error(`project non valido: ${project}. Usa slug kebab-case (es. download-mail)`);
+        throw new Error(`project non valido: ${project}. Usa slug kebab-case (es. prj01)`);
     }
 }
 

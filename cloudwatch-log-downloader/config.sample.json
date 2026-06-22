@@ -18,16 +18,16 @@
   },
   "cloudwatch": [
     {
-      "project": "download-mail",
+      "project": "prj01",
       "logGroups": [
-        "/eks/my-namespace/my-email-worker-prod",
-        "/eks/my-namespace/my-email-services-prod"
+        "/eks/my-namespace/my-prj-worker-prod",
+        "/eks/my-namespace/my-prj-services-prod"
       ],
       "filterPattern": "",
       "maxResults": 100000,
       "monitorPatterns": [],
       "exceptionPatterns": [
-        "[ERROR][MY-EMAIL-WORKER]",
+        "[ERROR][MY-PRJ-WORKER]",
         " ERROR ",
         "Error on main",
         "Main Error",
@@ -40,7 +40,7 @@
       "files": {
         "logDirectory": "./logs",
         "retentionMinutes": 60,
-        "filePrefix": "download-mail-logs-prod",
+        "filePrefix": "prj01-logs-prod",
         "preserveExceptionPairs": true
       },
       "logging": {
@@ -49,16 +49,16 @@
       }
     },
     {
-      "project": "os-sinistri",
+      "project": "prj02",
       "logGroups": [
-        "/eks/my-namespace/my-sinistri-worker-prod",
-        "/eks/my-namespace/my-sinistri-api-prod"
+        "/eks/my-namespace/my-prj-worker-prod",
+        "/eks/my-namespace/my-prj-api-prod"
       ],
       "filterPattern": "",
       "maxResults": 100000,
       "monitorPatterns": [],
       "exceptionPatterns": [
-        "[ERROR][MY-SINISTRI]",
+        "[ERROR][MY-PRJ-WORKER]",
         " ERROR ",
         "Error on main",
         "Main Error",
@@ -71,7 +71,7 @@
       "files": {
         "logDirectory": "./logs",
         "retentionMinutes": 60,
-        "filePrefix": "os-sinistri-logs-prod",
+        "filePrefix": "prj02-logs-prod",
         "preserveExceptionPairs": true
       },
       "logging": {

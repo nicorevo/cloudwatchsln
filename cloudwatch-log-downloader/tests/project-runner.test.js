@@ -15,7 +15,7 @@ const ROOT_CONFIG = {
 };
 
 const PROJECT_ENTRY = {
-    project: 'download-mail',
+    project: 'prj01',
     logGroups: ['/eks/ns/worker-prod'],
     filterPattern: 'ERROR',
     maxResults: 50000,
@@ -27,7 +27,7 @@ const PROJECT_ENTRY = {
     },
     files: {
         logDirectory: './logs',
-        filePrefix: 'download-mail-logs-prod',
+        filePrefix: 'prj01-logs-prod',
         retentionMinutes: 60,
         preserveExceptionPairs: true
     },
@@ -56,7 +56,7 @@ test('buildSyntheticProjectConfig shaped come config monoprogetto', () => {
     const config = buildSyntheticProjectConfig(ROOT_CONFIG, PROJECT_ENTRY);
 
     assert.equal(config.environment, 'prod');
-    assert.equal(config.project, 'download-mail');
+    assert.equal(config.project, 'prj01');
     assert.deepEqual(config.aws, ROOT_CONFIG.aws);
     assert.deepEqual(config.cloudwatch.logGroups, ['/eks/ns/worker-prod']);
     assert.equal(config.cloudwatch.filterPattern, 'ERROR');
@@ -96,7 +96,7 @@ test('ProjectRunner downloadLogs scrive eventi e aggiorna lastProcessedTime', as
     assert.equal(writtenEvents.length, 1);
     assert.ok(runner.lastProcessedTime > startTime);
     assert.equal(logger.calls.some(call => call.message === 'Download complete: 1 events processed'), true);
-    assert.equal(logger.calls.some(call => call.data?.project === 'download-mail'), true);
+    assert.equal(logger.calls.some(call => call.data?.project === 'prj01'), true);
 });
 
 test('ProjectRunner downloadLogs aggiorna lastProcessedTime anche senza eventi', async () => {
@@ -146,7 +146,7 @@ test('ProjectRunner downloadLogs non propaga errori CloudWatch', async () => {
     assert.equal(runner.lastProcessedTime, startTime);
     const errorCall = logger.calls.find(call => call.level === 'error');
     assert.ok(errorCall);
-    assert.equal(errorCall.data.project, 'download-mail');
+    assert.equal(errorCall.data.project, 'prj01');
     assert.match(errorCall.data.message, /AWS unavailable/);
 });
 
@@ -190,7 +190,7 @@ test('ProjectRunner cleanupOldFiles non propaga errori', async () => {
 
     const errorCall = logger.calls.find(call => call.level === 'error');
     assert.ok(errorCall);
-    assert.equal(errorCall.data.project, 'download-mail');
+    assert.equal(errorCall.data.project, 'prj01');
 });
 
 test('ProjectRunner init delega a CloudWatchClient.init', async () => {
@@ -219,8 +219,8 @@ test('ProjectRunner getMonitorDescriptor espone metadati monitor', () => {
     });
 
     assert.deepEqual(runner.getMonitorDescriptor(), {
-        project: 'download-mail',
-        filePrefix: 'download-mail-logs-prod',
+        project: 'prj01',
+        filePrefix: 'prj01-logs-prod',
         logDirectory: './logs'
     });
 });

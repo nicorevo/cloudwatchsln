@@ -9,7 +9,7 @@
   },
   "cloudwatch": [
     {
-      "project": "download-mail",
+      "project": "prj01",
       "logGroups": ["/eks/ns/worker-prod"],
       "exceptionPatterns": [" ERROR "],
       "schedule": {
@@ -18,7 +18,7 @@
       },
       "files": {
         "logDirectory": "./logs",
-        "filePrefix": "download-mail-logs-prod",
+        "filePrefix": "prj01-logs-prod",
         "retentionMinutes": 60
       },
       "logging": {
