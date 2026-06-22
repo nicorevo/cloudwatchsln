@@ -7,6 +7,7 @@ cloudwatch-log-downloader/node_modules/
 
 # Private application examples (local only)
 download-mail/
+download-mail/service/
 
 # Local extended documentation (not published)
 docs/

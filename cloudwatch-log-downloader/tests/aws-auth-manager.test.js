@@ -30,10 +30,10 @@ const awsConfig = {
 test('parseIniSections reads profile and sso-session blocks', () => {
     const content = [
         '[profile test-profile]',
-        'sso_session = revo',
+        'sso_session = test-session',
         'sso_account_id = 123',
         '',
-        '[sso-session revo]',
+        '[sso-session test-session]',
         'sso_start_url = https://example.awsapps.com/start',
         'sso_region = eu-central-1'
     ].join('\n');
@@ -69,8 +69,8 @@ test('authenticate resolves credentials and identity', async () => {
             };
         },
         verifyIdentity: async () => ({
-            Account: '890905897467',
-            Arn: 'arn:aws:sts::890905897467:assumed-role/Test'
+            Account: '123456789012',
+            Arn: 'arn:aws:sts::123456789012:assumed-role/Test'
         }),
         getSsoSessionExpiry: async () => new Date('2026-06-20T18:00:00.000Z')
     });
@@ -78,7 +78,7 @@ test('authenticate resolves credentials and identity', async () => {
     const result = await authManager.authenticate();
 
     assert.equal(providerCalls, 1);
-    assert.equal(result.account, '890905897467');
+    assert.equal(result.account, '123456789012');
     assert.equal(result.credentialExpiration.toISOString(), expiration.toISOString());
     assert.equal(authManager.isAuthenticated(), true);
 });
