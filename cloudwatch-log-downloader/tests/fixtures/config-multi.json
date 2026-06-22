@@ -1,0 +1,48 @@
+{
+  "environment": "uat",
+  "aws": {
+    "region": "eu-central-1",
+    "profile": "test-profile"
+  },
+  "monitor": {
+    "enabled": false
+  },
+  "cloudwatch": [
+    {
+      "project": "download-mail",
+      "logGroups": ["/eks/ns/worker-prod"],
+      "exceptionPatterns": [" ERROR "],
+      "schedule": {
+        "downloadInterval": "*/1 * * * *",
+        "cleanupInterval": "*/60 * * * *"
+      },
+      "files": {
+        "logDirectory": "./logs",
+        "filePrefix": "download-mail-logs-prod",
+        "retentionMinutes": 60
+      },
+      "logging": {
+        "level": "info",
+        "enableConsole": true
+      }
+    },
+    {
+      "project": "other-service",
+      "logGroups": ["/eks/ns/other-prod"],
+      "exceptionPatterns": ["Exception"],
+      "schedule": {
+        "downloadInterval": "*/2 * * * *",
+        "cleanupInterval": "0 */2 * * *"
+      },
+      "files": {
+        "logDirectory": "./logs",
+        "filePrefix": "other-service-logs-prod",
+        "retentionMinutes": 120
+      },
+      "logging": {
+        "level": "warn",
+        "enableConsole": false
+      }
+    }
+  ]
+}

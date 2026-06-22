@@ -1,0 +1,2 @@
+[2026-06-19T09:00:05.000Z] [/eks/overx-sinistri/os-email-worker-prod | os-email-worker-prod] ERROR first exception at line 5
+[2026-06-19T09:00:15.000Z] [/eks/overx-sinistri/os-email-worker-prod | os-email-worker-prod] ERROR second exception at line 15

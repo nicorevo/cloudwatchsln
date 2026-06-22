@@ -36,8 +36,10 @@ cloudwatch-log-downloader/read.me.aws
 # Archives / scratch
 src/*.zip
 
-# Logs
+# Logs (runtime output; keep test fixtures under tests/fixtures/logs/)
 logs/
+!cloudwatch-log-downloader/tests/fixtures/logs/
+!cloudwatch-log-downloader/tests/fixtures/logs/**
 *.log
 npm-debug.log*
 yarn-debug.log*

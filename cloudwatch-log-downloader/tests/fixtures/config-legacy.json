@@ -1,0 +1,29 @@
+{
+  "environment": "prod",
+  "project": "download-mail",
+  "aws": {
+    "region": "eu-central-1",
+    "profile": "test-profile"
+  },
+  "monitor": {
+    "enabled": false
+  },
+  "cloudwatch": {
+    "logGroups": ["/eks/ns/worker-prod"],
+    "exceptionPatterns": [" ERROR "]
+  },
+  "schedule": {
+    "downloadInterval": "*/1 * * * *",
+    "cleanupInterval": "*/60 * * * *"
+  },
+  "files": {
+    "logDirectory": "./logs",
+    "retentionMinutes": 60,
+    "filePrefix": "download-mail-logs-prod",
+    "preserveExceptionPairs": true
+  },
+  "logging": {
+    "level": "info",
+    "enableConsole": true
+  }
+}

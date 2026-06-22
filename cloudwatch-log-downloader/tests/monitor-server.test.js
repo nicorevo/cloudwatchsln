@@ -7,40 +7,147 @@ const MonitorServer = require('../src/monitor/monitor-server');
 
 const FIXTURE_DIR = path.join(__dirname, 'fixtures', 'logs');
 const FILE_PREFIX = 'my-app-logs-prod';
+const OTHER_PREFIX = 'other-service-logs-prod';
 const logger = {
     info() {},
     error() {}
 };
 
-test('monitor server exposes health tree and detail endpoints', async () => {
-    const config = {
-        enabled: true,
-        host: '127.0.0.1',
-        port: 0,
-        contextLinesBefore: 10,
-        contextLinesAfter: 10,
-        treeRefreshSeconds: 30,
-        maxExceptionFiles: 50
-    };
+const MONITOR_CONFIG = {
+    enabled: true,
+    host: '127.0.0.1',
+    port: 0,
+    contextLinesBefore: 10,
+    contextLinesAfter: 10,
+    treeRefreshSeconds: 30,
+    maxExceptionFiles: 50
+};
 
-    const server = new MonitorServer(config, logger, FILE_PREFIX, FIXTURE_DIR);
+function singleProject(projects = []) {
+    if (projects.length > 0) {
+        return projects;
+    }
+
+    return [{
+        project: 'my-app',
+        filePrefix: FILE_PREFIX,
+        logDirectory: FIXTURE_DIR,
+        logDirectoryDisplay: './logs'
+    }];
+}
+
+test('monitor server espone health tree e detail per progetto', async () => {
+    const server = new MonitorServer(MONITOR_CONFIG, logger, singleProject());
     await server.start();
-
-    const address = server.server.address();
-    const baseUrl = `http://127.0.0.1:${address.port}`;
+    const baseUrl = `http://127.0.0.1:${server.server.address().port}`;
 
     try {
-        const health = await requestJson(`${baseUrl}/api/v1/health`);
+        const health = await requestJson(`${baseUrl}/api/v1/projects/my-app/health`);
         assert.equal(health.status, 'ok');
+        assert.equal(health.project, 'my-app');
         assert.equal(health.exceptionFileCount, 2);
 
-        const tree = await requestJson(`${baseUrl}/api/v1/exceptions/tree`);
+        const tree = await requestJson(`${baseUrl}/api/v1/projects/my-app/exceptions/tree`);
+        assert.equal(tree.project, 'my-app');
         const fixtureFile = tree.files.find(file => file.id === 'fixture');
         assert.ok(fixtureFile);
         assert.equal(fixtureFile.exceptions[0].id, 'fixture:1');
 
-        const detail = await requestJson(`${baseUrl}/api/v1/exceptions/fixture:2`);
+        const detail = await requestJson(`${baseUrl}/api/v1/projects/my-app/exceptions/fixture:2`);
+        assert.equal(detail.project, 'my-app');
         assert.equal(detail.exception.lineNumberInMain, 15);
+    } finally {
+        await server.stop();
+    }
+});
+
+test('monitor server espone lista progetti', async () => {
+    const server = new MonitorServer(MONITOR_CONFIG, logger, singleProject());
+    await server.start();
+    const baseUrl = `http://127.0.0.1:${server.server.address().port}`;
+
+    try {
+        const projects = await requestJson(`${baseUrl}/api/v1/projects`);
+        assert.equal(projects.projects.length, 1);
+        assert.equal(projects.projects[0].id, 'my-app');
+        assert.equal(projects.projects[0].filePrefix, FILE_PREFIX);
+    } finally {
+        await server.stop();
+    }
+});
+
+test('monitor server espone health globale aggregato', async () => {
+    const server = new MonitorServer(MONITOR_CONFIG, logger, singleProject());
+    await server.start();
+    const baseUrl = `http://127.0.0.1:${server.server.address().port}`;
+
+    try {
+        const health = await requestJson(`${baseUrl}/api/v1/health`);
+        assert.equal(health.status, 'ok');
+        assert.equal(health.projectCount, 1);
+        assert.equal(health.projects[0].id, 'my-app');
+        assert.equal(health.projects[0].exceptionFileCount, 2);
+    } finally {
+        await server.stop();
+    }
+});
+
+test('monitor server isola tree per progetto', async () => {
+    const server = new MonitorServer(MONITOR_CONFIG, logger, singleProject([
+        {
+            project: 'my-app',
+            filePrefix: FILE_PREFIX,
+            logDirectory: FIXTURE_DIR,
+            logDirectoryDisplay: './logs'
+        },
+        {
+            project: 'other-service',
+            filePrefix: OTHER_PREFIX,
+            logDirectory: FIXTURE_DIR,
+            logDirectoryDisplay: './logs'
+        }
+    ]));
+    await server.start();
+    const baseUrl = `http://127.0.0.1:${server.server.address().port}`;
+
+    try {
+        const treeA = await requestJson(`${baseUrl}/api/v1/projects/my-app/exceptions/tree`);
+        assert.equal(treeA.project, 'my-app');
+        assert.ok(treeA.files.every(file => file.filename.startsWith(`${FILE_PREFIX}-exceptions_`)));
+
+        const treeB = await requestJson(`${baseUrl}/api/v1/projects/other-service/exceptions/tree`);
+        assert.equal(treeB.project, 'other-service');
+        assert.equal(treeB.files.length, 1);
+        assert.match(treeB.files[0].filename, /other-service-logs-prod-exceptions_/);
+    } finally {
+        await server.stop();
+    }
+});
+
+test('monitor server returns 404 for unknown project', async () => {
+    const server = await startServerOnRandomPort();
+
+    try {
+        const response = await request(`${server.baseUrl}/api/v1/projects/unknown/exceptions/tree`);
+        assert.equal(response.statusCode, 404);
+        assert.equal(response.body.code, 'PROJECT_NOT_FOUND');
+        assert.equal(response.body.project, 'unknown');
+    } finally {
+        await server.stop();
+    }
+});
+
+test('monitor server returns 410 for legacy exception endpoints', async () => {
+    const server = await startServerOnRandomPort();
+
+    try {
+        const tree = await request(`${server.baseUrl}/api/v1/exceptions/tree`);
+        assert.equal(tree.statusCode, 410);
+        assert.equal(tree.body.code, 'GONE');
+
+        const detail = await request(`${server.baseUrl}/api/v1/exceptions/fixture:1`);
+        assert.equal(detail.statusCode, 410);
+        assert.equal(detail.body.code, 'GONE');
     } finally {
         await server.stop();
     }
@@ -50,7 +157,7 @@ test('monitor server returns 400 for invalid exception id', async () => {
     const server = await startServerOnRandomPort();
 
     try {
-        const response = await request(`${server.baseUrl}/api/v1/exceptions/not-valid`);
+        const response = await request(`${server.baseUrl}/api/v1/projects/my-app/exceptions/not-valid`);
         assert.equal(response.statusCode, 400);
         assert.equal(response.body.code, 'INVALID_ID');
     } finally {
@@ -62,7 +169,7 @@ test('monitor server returns 404 for unknown exception id', async () => {
     const server = await startServerOnRandomPort();
 
     try {
-        const response = await request(`${server.baseUrl}/api/v1/exceptions/fixture:99`);
+        const response = await request(`${server.baseUrl}/api/v1/projects/my-app/exceptions/fixture:99`);
         assert.equal(response.statusCode, 404);
         assert.equal(response.body.code, 'NOT_FOUND');
     } finally {
@@ -87,7 +194,7 @@ test('monitor server returns 400 for path traversal exception id', async () => {
     const maliciousId = `${encodeURIComponent('../../../etc/passwd')}:1`;
 
     try {
-        const response = await request(`${server.baseUrl}/api/v1/exceptions/${maliciousId}`);
+        const response = await request(`${server.baseUrl}/api/v1/projects/my-app/exceptions/${maliciousId}`);
         assert.equal(response.statusCode, 400);
         assert.equal(response.body.code, 'INVALID_ID');
     } finally {
@@ -95,58 +202,32 @@ test('monitor server returns 400 for path traversal exception id', async () => {
     }
 });
 
-test('monitor server health returns configured log directory display path', async () => {
-    const config = {
-        enabled: true,
-        host: '127.0.0.1',
-        port: 0,
-        contextLinesBefore: 10,
-        contextLinesAfter: 10,
-        treeRefreshSeconds: 30,
-        maxExceptionFiles: 50
-    };
-
-    const server = new MonitorServer(config, logger, FILE_PREFIX, FIXTURE_DIR, './logs');
+test('monitor server health progetto restituisce log directory display', async () => {
+    const server = new MonitorServer(MONITOR_CONFIG, logger, singleProject());
     await server.start();
     const baseUrl = `http://127.0.0.1:${server.server.address().port}`;
 
     try {
-        const health = await requestJson(`${baseUrl}/api/v1/health`);
+        const health = await requestJson(`${baseUrl}/api/v1/projects/my-app/health`);
         assert.equal(health.logDirectory, './logs');
+        assert.equal(health.filePrefix, FILE_PREFIX);
     } finally {
         await server.stop();
     }
 });
 
 test('monitor server does not listen when disabled', async () => {
-    const config = {
-        enabled: false,
-        host: '127.0.0.1',
-        port: 0,
-        contextLinesBefore: 10,
-        contextLinesAfter: 10,
-        treeRefreshSeconds: 30,
-        maxExceptionFiles: 50
-    };
-
-    const server = new MonitorServer(config, logger, FILE_PREFIX, FIXTURE_DIR);
+    const server = new MonitorServer({
+        ...MONITOR_CONFIG,
+        enabled: false
+    }, logger, singleProject());
     await server.start();
 
     assert.equal(server.server, null);
 });
 
 async function startServerOnRandomPort() {
-    const config = {
-        enabled: true,
-        host: '127.0.0.1',
-        port: 0,
-        contextLinesBefore: 10,
-        contextLinesAfter: 10,
-        treeRefreshSeconds: 30,
-        maxExceptionFiles: 50
-    };
-
-    const server = new MonitorServer(config, logger, FILE_PREFIX, FIXTURE_DIR);
+    const server = new MonitorServer(MONITOR_CONFIG, logger, singleProject());
     await server.start();
     const address = server.server.address();
 

@@ -4,7 +4,8 @@ const moment = require('moment');
 
 class Logger {
     constructor(config) {
-        this.level = config.logging.level || 'info';
+        const rawLevel = config.logging?.level || 'info';
+        this.level = typeof rawLevel === 'string' ? rawLevel.toLowerCase() : 'info';
         this.enableConsole = config.logging.enableConsole !== false;
         this.logLevels = {
             error: 0,

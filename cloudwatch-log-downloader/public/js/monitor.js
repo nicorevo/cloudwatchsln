@@ -1,10 +1,15 @@
+const STORAGE_KEY = 'monitor.selectedProject';
+
 const state = {
+    selectedProject: null,
+    projects: [],
     selectedId: null,
     lastTree: null,
     refreshSeconds: 30,
     refreshTimer: null
 };
 
+const projectSelect = document.getElementById('project-select');
 const treeContainer = document.getElementById('exception-tree');
 const exceptionCount = document.getElementById('exception-count');
 const lastRefresh = document.getElementById('last-refresh');
@@ -14,6 +19,10 @@ const detailTitle = document.getElementById('detail-title');
 const detailMeta = document.getElementById('detail-meta');
 const detailWarning = document.getElementById('detail-warning');
 const detailLog = document.getElementById('detail-log');
+
+function projectApiPath(project, suffix) {
+    return `/api/v1/projects/${encodeURIComponent(project)}${suffix}`;
+}
 
 async function fetchJson(url) {
     const response = await fetch(url);
@@ -38,6 +47,49 @@ function classifyLine(text) {
     }
 
     return '';
+}
+
+function resetDetailPanel(message = 'Select an exception from the tree') {
+    state.selectedId = null;
+    detailContent.classList.add('hidden');
+    detailEmpty.classList.remove('hidden');
+    detailEmpty.textContent = message;
+}
+
+function resolveSelectedProject(projects) {
+    const storedProject = sessionStorage.getItem(STORAGE_KEY);
+    if (storedProject && projects.some(project => project.id === storedProject)) {
+        return storedProject;
+    }
+
+    return projects[0]?.id || null;
+}
+
+function renderProjectOptions(projects, selectedProject) {
+    projectSelect.innerHTML = '';
+
+    projects.forEach(project => {
+        const option = document.createElement('option');
+        option.value = project.id;
+        option.textContent = project.id;
+        option.selected = project.id === selectedProject;
+        projectSelect.appendChild(option);
+    });
+
+    projectSelect.classList.toggle('hidden', projects.length <= 1);
+}
+
+async function loadProjects() {
+    const payload = await fetchJson('/api/v1/projects');
+    state.projects = payload.projects || [];
+
+    if (state.projects.length === 0) {
+        throw new Error('No monitored projects configured');
+    }
+
+    state.selectedProject = resolveSelectedProject(state.projects);
+    sessionStorage.setItem(STORAGE_KEY, state.selectedProject);
+    renderProjectOptions(state.projects, state.selectedProject);
 }
 
 function renderTree(tree) {
@@ -106,6 +158,7 @@ function renderDetail(detail) {
 
     detailTitle.textContent = `Exception ${detail.id}`;
     detailMeta.textContent = [
+        detail.project || state.selectedProject,
         detail.exception.timestamp || 'timestamp n/d',
         detail.exception.source || 'source n/d',
         detail.files.exceptionFile,
@@ -139,13 +192,18 @@ function renderDetail(detail) {
 }
 
 async function loadExceptionDetail(exceptionId) {
+    if (!state.selectedProject) {
+        resetDetailPanel('Select a project first');
+        return;
+    }
+
     try {
-        const detail = await fetchJson(`/api/v1/exceptions/${encodeURIComponent(exceptionId)}`);
+        const detail = await fetchJson(
+            projectApiPath(state.selectedProject, `/exceptions/${encodeURIComponent(exceptionId)}`)
+        );
         renderDetail(detail);
     } catch (error) {
-        detailEmpty.classList.remove('hidden');
-        detailContent.classList.add('hidden');
-        detailEmpty.textContent = `Error loading detail: ${error.message}`;
+        resetDetailPanel(`Error loading detail: ${error.message}`);
     }
 }
 
@@ -158,10 +216,15 @@ function scheduleRefresh() {
 }
 
 async function refreshTree() {
+    if (!state.selectedProject) {
+        treeContainer.innerHTML = '<p class="placeholder">Select a project to load exceptions</p>';
+        return;
+    }
+
     try {
         const [health, tree] = await Promise.all([
-            fetchJson('/api/v1/health'),
-            fetchJson('/api/v1/exceptions/tree')
+            fetchJson(projectApiPath(state.selectedProject, '/health')),
+            fetchJson(projectApiPath(state.selectedProject, '/exceptions/tree'))
         ]);
 
         const nextRefreshSeconds = health.treeRefreshSeconds || state.refreshSeconds;
@@ -181,10 +244,7 @@ async function refreshTree() {
             if (stillExists) {
                 await loadExceptionDetail(state.selectedId);
             } else {
-                state.selectedId = null;
-                detailContent.classList.add('hidden');
-                detailEmpty.classList.remove('hidden');
-                detailEmpty.textContent = 'Select an exception from the tree';
+                resetDetailPanel('Select an exception from the tree');
             }
         }
     } catch (error) {
@@ -192,9 +252,32 @@ async function refreshTree() {
     }
 }
 
-async function initMonitorUi() {
+async function handleProjectChange(nextProject) {
+    if (!nextProject || nextProject === state.selectedProject) {
+        return;
+    }
+
+    state.selectedProject = nextProject;
+    sessionStorage.setItem(STORAGE_KEY, nextProject);
+    state.lastTree = null;
+    resetDetailPanel('Select an exception from the tree');
     await refreshTree();
-    scheduleRefresh();
+}
+
+async function initMonitorUi() {
+    try {
+        await loadProjects();
+        projectSelect.addEventListener('change', event => {
+            handleProjectChange(event.target.value).catch(error => {
+                treeContainer.innerHTML = `<p class="placeholder">Error switching project: ${error.message}</p>`;
+            });
+        });
+        await refreshTree();
+        scheduleRefresh();
+    } catch (error) {
+        treeContainer.innerHTML = `<p class="placeholder">Error loading projects: ${error.message}</p>`;
+        resetDetailPanel('Unable to load monitor projects');
+    }
 }
 
 initMonitorUi();

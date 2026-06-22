@@ -5,13 +5,13 @@
 Built for teams who want to **observe microservices in UAT/prod** without the AWS Console: grep, scripts, offline debugging, or optional AI-assisted pattern tuning on plain-text files.
 
 ```
-  AWS CloudWatch (logGroups[])
+  AWS CloudWatch (cloudwatch[].logGroups[])
            │
            ▼
-  cloudwatch-log-downloader  ──►  ./logs/my-app_2026-06-19_12-00.log
-           │                      ./logs/my-app-exceptions_2026-06-19_12-00.log
+  cloudwatch-log-downloader  ──►  ./logs/{filePrefix}_*.log
+           │                      ./logs/{filePrefix}-exceptions_*.log
            ▼
-  http://127.0.0.1:3847  (exception tree + ±10 line context)
+  http://127.0.0.1:3847  (project selector + exception tree + ±10 line context)
 ```
 
 ---
@@ -20,13 +20,14 @@ Built for teams who want to **observe microservices in UAT/prod** without the AW
 
 | Feature | Description |
 |---------|-------------|
-| **Scheduled download** | CloudWatch polling with configurable cron |
-| **Multi log group** | A `logGroups[]` array — typical on EKS: one path per pod/deployment |
+| **Multi-project** | One process monitors N services via `cloudwatch[]` — per-project schedule, files, patterns |
+| **Scheduled download** | CloudWatch polling with configurable cron per project |
+| **Multi log group** | A `logGroups[]` array per project — typical on EKS: one path per pod/deployment |
 | **Rolling files** | One file per minute (configurable), append within the same minute |
 | **Exceptions** | Configurable patterns → dedicated `-exceptions_*.log` files |
 | **Retention** | Automatic cleanup; `preserveExceptionPairs` keeps exception/main pairs |
 | **AWS SSO** | Auth at startup + STS credential refresh every ~55 min |
-| **Exception Monitor** | Local UI + JSON REST API (`/api/v1/...`) |
+| **Exception Monitor** | Local UI + JSON REST API scoped by project (`/api/v1/projects/{project}/…`) |
 
 ---
 
@@ -57,37 +58,56 @@ Essential fields:
 ```json
 {
   "environment": "prod",
-  "project": "my-application",
   "aws": {
     "region": "eu-west-1",
     "profile": "my-aws-sso-profile"
   },
-  "cloudwatch": {
-    "logGroups": [
-      "/eks/my-namespace/my-worker-prod",
-      "/eks/my-namespace/my-api-prod"
-    ],
-    "exceptionPatterns": [
-      " ERROR ",
-      "Exception",
-      "Traceback (most recent call last)"
-    ]
+  "monitor": {
+    "enabled": true,
+    "port": 3847
   },
-  "files": {
-    "logDirectory": "./logs",
-    "filePrefix": "my-app-logs-prod",
-    "retentionMinutes": 60,
-    "preserveExceptionPairs": true
-  }
+  "cloudwatch": [
+    {
+      "project": "my-application",
+      "logGroups": [
+        "/eks/my-namespace/my-worker-prod",
+        "/eks/my-namespace/my-api-prod"
+      ],
+      "exceptionPatterns": [
+        " ERROR ",
+        "Exception",
+        "Traceback (most recent call last)"
+      ],
+      "schedule": {
+        "downloadInterval": "*/1 * * * *",
+        "cleanupInterval": "*/60 * * * *"
+      },
+      "files": {
+        "logDirectory": "./logs",
+        "filePrefix": "my-app-logs-prod",
+        "retentionMinutes": 60,
+        "preserveExceptionPairs": true
+      },
+      "logging": {
+        "level": "info",
+        "enableConsole": true
+      }
+    }
+  ]
 }
 ```
 
+Add more entries to `cloudwatch[]` to monitor additional services in the same process. Each entry needs a unique `project` slug and `files.filePrefix`.
+
 | Field | Purpose |
 |-------|---------|
-| `logGroups[]` | CloudWatch paths to query (preferred on EKS) |
-| `exceptionPatterns[]` | Substrings copied into `-exceptions_*` files |
-| `filePrefix` | Filename prefix under `./logs/` |
+| `cloudwatch[].project` | Slug for API paths and UI selector (`^[a-z0-9][a-z0-9-]*$`) |
+| `cloudwatch[].logGroups[]` | CloudWatch paths to query (preferred on EKS) |
+| `cloudwatch[].exceptionPatterns[]` | Substrings copied into `-exceptions_*` files |
+| `cloudwatch[].files.filePrefix` | Filename prefix under `./logs/` (must be unique per entry) |
 | `monitor.enabled` | Exception UI at `http://127.0.0.1:3847` |
+
+Legacy single-project configs (root `project` + object `cloudwatch`) are auto-migrated at startup.
 
 Other useful fields in `config.sample.json`:
 
@@ -95,10 +115,11 @@ Other useful fields in `config.sample.json`:
 |---------|-------|---------|-------------|
 | `aws` | `credentialRefreshIntervalMinutes` | `55` | Proactive STS credential refresh |
 | `aws` | `loginOnStartupIfNeeded` | `false` | Opens SSO browser if session is missing |
-| `cloudwatch` | `monitorPatterns` | `[]` | Empty = all lines in the main file |
-| `files` | `preserveExceptionPairs` | `true` | Do not delete exception/main pairs |
+| `cloudwatch[]` | `monitorPatterns` | `[]` | Empty = all lines in the main file |
+| `cloudwatch[]` | `schedule.downloadInterval` | `*/1 * * * *` | Download cron per project (Europe/Rome) |
+| `cloudwatch[]` | `files.preserveExceptionPairs` | `true` | Do not delete exception/main pairs |
+| `cloudwatch[]` | `logging.level` | `info` | Service log level uses the **first** entry's `logging.level` |
 | `monitor` | `port` | `3847` | Exception Monitor port |
-| `schedule` | `downloadInterval` | `*/1 * * * *` | Download cron (Europe/Rome) |
 
 Discover EKS log groups:
 
@@ -134,7 +155,7 @@ logs/
 
 ## Configuring exception patterns (optional AI workflow)
 
-The most important step for a new project is populating `exceptionPatterns[]`: strings that, when found in a log line, copy that line into the exceptions file.
+The most important step for a new project is populating `cloudwatch[].exceptionPatterns`: strings that, when found in a log line, copy that line into the exceptions file.
 
 ### Recommended workflow
 
@@ -144,7 +165,7 @@ The most important step for a new project is populating `exceptionPatterns[]`: s
 
    > Analyze this code and produce a list of log patterns for `exceptionPatterns` in a CloudWatch downloader. Include exact ERROR messages, logger prefixes, Python/Java stack traces, and classify by priority P0–P3.
 
-4. **Paste the patterns** into `config.prod.json` → restart the service.
+4. **Paste the patterns** into the matching `cloudwatch[].exceptionPatterns` entry → restart the service.
 5. **Verify** in `./logs/*-exceptions_*.log` and in the UI on `:3847`.
 
 Generic starter patterns:
@@ -167,10 +188,14 @@ With `monitor.enabled: true` (default in the sample):
 
 | URL | Description |
 |-----|-------------|
-| `http://127.0.0.1:3847/` | Exception tree + context panel |
-| `GET /api/v1/exceptions/tree` | JSON tree: files → exceptions |
-| `GET /api/v1/exceptions/:id` | Exception + before/after lines from main file |
+| `http://127.0.0.1:3847/` | Exception tree + context panel (project dropdown) |
+| `GET /api/v1/projects` | List configured projects |
+| `GET /api/v1/projects/{project}/health` | Monitor status for one project |
+| `GET /api/v1/projects/{project}/exceptions/tree` | JSON tree: files → exceptions |
+| `GET /api/v1/projects/{project}/exceptions/:id` | Exception + before/after lines from main file |
 | `GET /api/v1/health` | Monitor status |
+
+Legacy routes (`GET /api/v1/exceptions/*`) respond with **410 Gone**.
 
 Disable with: `"monitor": { "enabled": false }`.
 
@@ -196,13 +221,15 @@ Initial SSO setup: `cloudwatch-log-downloader/setup-sso.sh`
 ```
 cloudwatch-log-downloader/
 ├── src/
-│   ├── index.js                 # Orchestration, cron, auth
+│   ├── index.js                 # Orchestration, cron, auth, N project runners
+│   ├── config-normalizer.js     # cloudwatch[] validation + legacy migration
+│   ├── project-runner.js        # Per-project download/cleanup config
 │   ├── aws-auth-manager.js      # SSO + STS refresh
 │   ├── cloudwatch-client.js     # FilterLogEvents
 │   ├── file-manager.js          # Rolling + exceptions + retention
 │   └── monitor/                 # HTTP server + exception UI
 ├── public/                      # Exception Monitor frontend
-├── config.sample.json           # Committed template
+├── config.sample.json           # Committed template (multi-project)
 ├── config.prod.json             # Local (gitignored)
 └── tests/
 ```
@@ -218,7 +245,7 @@ aws sso login --profile my-aws-sso-profile
 npm run start:prod
 ```
 
-**0 events downloaded** — check `logGroups[]`, region, and AWS profile in the CloudWatch Console.
+**0 events downloaded** — check `cloudwatch[].logGroups[]`, region, and AWS profile in the CloudWatch Console.
 
 **BrokenPipeError during `aws sso login`** — often harmless; verify with `aws sts get-caller-identity --profile ...`.
 

@@ -55,7 +55,7 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
             echo ""
             echo "🎉 Setup complete! Next steps:"
             echo "  1. Copy config.sample.json to config.uat.json or config.prod.json"
-            echo "  2. Customize AWS profile and logGroups"
+            echo "  2. Customize AWS profile and cloudwatch[] entries (project, logGroups, filePrefix)"
             echo "  3. npm install"
             echo "  4. npm start"
             echo ""

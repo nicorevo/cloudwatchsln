@@ -1,0 +1,10 @@
+[2026-06-19T10:00:01.000Z] [/eks/my-namespace/other-api-prod | other-api-container] INFO other bootstrap line 1
+[2026-06-19T10:00:02.000Z] [/eks/my-namespace/other-api-prod | other-api-container] INFO other bootstrap line 2
+[2026-06-19T10:00:03.000Z] [/eks/my-namespace/other-api-prod | other-api-container] INFO other bootstrap line 3
+[2026-06-19T10:00:04.000Z] [/eks/my-namespace/other-api-prod | other-api-container] INFO other bootstrap line 4
+[2026-06-19T10:00:05.000Z] [/eks/my-namespace/other-api-prod | other-api-container] INFO other bootstrap line 5
+[2026-06-19T10:00:06.000Z] [/eks/my-namespace/other-api-prod | other-api-container] INFO other bootstrap line 6
+[2026-06-19T10:00:07.000Z] [/eks/my-namespace/other-api-prod | other-api-container] ERROR other-service exception at line 7
+[2026-06-19T10:00:08.000Z] [/eks/my-namespace/other-api-prod | other-api-container] INFO other context line 8
+[2026-06-19T10:00:09.000Z] [/eks/my-namespace/other-api-prod | other-api-container] INFO other context line 9
+[2026-06-19T10:00:10.000Z] [/eks/my-namespace/other-api-prod | other-api-container] INFO other context line 10

@@ -1,29 +1,28 @@
 const cron = require('node-cron');
 const fs = require('fs-extra');
 const path = require('path');
-const moment = require('moment');
 
 const Logger = require('./logger');
-const CloudWatchClient = require('./cloudwatch-client');
-const FileManager = require('./file-manager');
 const MonitorServer = require('./monitor/monitor-server');
 const { AwsAuthManager } = require('./aws-auth-manager');
 const { normalizeAwsConfig } = require('./aws-config');
 const { normalizeMonitorConfig } = require('./monitor/monitor-config');
+const { normalizeConfig } = require('./config-normalizer');
+const { ProjectRunner } = require('./project-runner');
 
 class CloudWatchLogDownloader {
-    constructor() {
-        this.configPath = this.resolveConfigPath();
+    constructor(options = {}) {
+        this.configPath = options.configPath ?? this.resolveConfigPath();
+        this.ProjectRunnerClass = options.ProjectRunnerClass ?? ProjectRunner;
+        this.AwsAuthManagerClass = options.AwsAuthManagerClass ?? AwsAuthManager;
         this.config = null;
         this.logger = null;
-        this.cloudWatchClient = null;
         this.authManager = null;
-        this.fileManager = null;
+        this.projectRunners = [];
         this.monitorServer = null;
-        this.lastProcessedTime = null;
-        this.downloadJob = null;
-        this.cleanupJob = null;
+        this.scheduledJobs = [];
         this.credentialRefreshTimer = null;
+        this.shutdownHandlersRegistered = false;
     }
 
     resolveConfigPath() {
@@ -44,27 +43,38 @@ class CloudWatchLogDownloader {
         return path.join(configDir, `config.${configEnv}.json`);
     }
 
+    buildLoggerConfig() {
+        // Livello log del servizio: usa logging del primo progetto in cloudwatch[].
+        return {
+            ...this.config,
+            logging: this.config.cloudwatch[0]?.logging || {
+                level: 'info',
+                enableConsole: true
+            }
+        };
+    }
+
     async init() {
         try {
             await this.loadConfig();
-            this.logger = new Logger(this.config);
+            this.logger = new Logger(this.buildLoggerConfig());
             this.logger.info('=== CloudWatch Log Downloader started ===');
 
-            this.authManager = new AwsAuthManager(this.config.aws, this.logger);
+            this.authManager = new this.AwsAuthManagerClass(this.config.aws, this.logger);
             await this.authManager.authenticate();
 
-            this.cloudWatchClient = new CloudWatchClient(this.config, this.logger, this.authManager);
-            await this.cloudWatchClient.init();
-            this.fileManager = new FileManager(this.config, this.logger);
-
-            this.lastProcessedTime = Date.now() - (15 * 60 * 1000); // 15 minutes ago
+            await this.initProjectRunners();
 
             this.logger.info('Initialization complete', {
                 configFile: path.basename(this.configPath),
                 environment: this.config.environment,
-                project: this.config.project,
-                logGroups: this.cloudWatchClient.logGroups,
-                retentionMinutes: this.config.files.retentionMinutes,
+                projectCount: this.projectRunners.length,
+                projects: this.projectRunners.map(runner => ({
+                    project: runner.project,
+                    logGroups: runner.cloudWatchClient.logGroups,
+                    retentionMinutes: runner.config.files.retentionMinutes,
+                    filePrefix: runner.config.files.filePrefix
+                })),
                 monitorEnabled: this.config.monitor.enabled,
                 monitorUrl: this.config.monitor.enabled
                     ? `http://${this.config.monitor.host}:${this.config.monitor.port}`
@@ -72,20 +82,60 @@ class CloudWatchLogDownloader {
             });
 
             if (this.config.monitor.enabled) {
-                this.monitorServer = new MonitorServer(
-                    this.config.monitor,
-                    this.logger,
-                    this.config.files.filePrefix,
-                    path.resolve(this.config.files.logDirectory),
-                    this.config.files.logDirectory
-                );
-                await this.monitorServer.start();
+                await this.startMonitorServer();
             }
 
         } catch (error) {
             console.error('Initialization error:', error);
             process.exit(1);
         }
+    }
+
+    async initProjectRunners() {
+        this.projectRunners = [];
+
+        for (let index = 0; index < this.config.cloudwatch.length; index++) {
+            const entry = this.config.cloudwatch[index];
+            const runner = new this.ProjectRunnerClass(
+                this.config,
+                entry,
+                this.authManager,
+                this.logger
+            );
+            await runner.init({ skipCredentialTest: index > 0 });
+            this.projectRunners.push(runner);
+        }
+    }
+
+    getMonitorProjectDescriptors() {
+        return this.projectRunners.map(runner => {
+            const descriptor = runner.getMonitorDescriptor();
+
+            return {
+                ...descriptor,
+                logDirectoryResolved: path.resolve(runner.config.files.logDirectory),
+                logDirectoryDisplay: runner.config.files.logDirectory
+            };
+        });
+    }
+
+    async startMonitorServer() {
+        const descriptors = this.getMonitorProjectDescriptors();
+        if (descriptors.length === 0) {
+            return;
+        }
+
+        this.monitorServer = new MonitorServer(
+            this.config.monitor,
+            this.logger,
+            descriptors.map(descriptor => ({
+                project: descriptor.project,
+                filePrefix: descriptor.filePrefix,
+                logDirectory: descriptor.logDirectoryResolved,
+                logDirectoryDisplay: descriptor.logDirectoryDisplay
+            }))
+        );
+        await this.monitorServer.start();
     }
 
     async loadConfig() {
@@ -97,8 +147,9 @@ class CloudWatchLogDownloader {
                 );
             }
 
-            this.config = await fs.readJson(this.configPath);
-            this.validateConfig();
+            const rawConfig = await fs.readJson(this.configPath);
+            this.validateAwsConfig(rawConfig);
+            this.config = normalizeConfig(rawConfig);
             this.config.aws = normalizeAwsConfig(this.config);
             this.config.monitor = normalizeMonitorConfig(this.config);
 
@@ -107,103 +158,82 @@ class CloudWatchLogDownloader {
         }
     }
 
-    validateConfig() {
-        const required = ['aws.region', 'files.logDirectory'];
-
-        for (const field of required) {
-            const keys = field.split('.');
-            let value = this.config;
-
-            for (const key of keys) {
-                value = value[key];
-                if (value === undefined) {
-                    throw new Error(`Missing required configuration field: ${field}`);
-                }
-            }
-        }
-
-        const { logGroups, logGroupName } = this.config.cloudwatch || {};
-        const hasLogGroups = Array.isArray(logGroups) && logGroups.length > 0;
-        if (!hasLogGroups && !logGroupName) {
-            throw new Error('Invalid CloudWatch configuration: set cloudwatch.logGroups[] or cloudwatch.logGroupName');
+    validateAwsConfig(config) {
+        if (!config?.aws?.region) {
+            throw new Error('Missing required configuration field: aws.region');
         }
     }
 
-    async downloadLogs() {
-        try {
-            const endTime = Date.now();
-            const startTime = this.lastProcessedTime;
-
-            this.logger.info('Starting log download', {
-                startTime: new Date(startTime).toISOString(),
-                endTime: new Date(endTime).toISOString(),
-                interval: moment.duration(endTime - startTime).humanize()
-            });
-
-            const events = await this.cloudWatchClient.fetchLogsPaginated(startTime, endTime);
-
-            if (events.length > 0) {
-                await this.fileManager.writeLogsToFile(events);
-                this.logger.info(`Download complete: ${events.length} events processed`);
-            } else {
-                this.logger.info('No new logs found for the specified period');
-            }
-
-            this.lastProcessedTime = endTime;
-
-        } catch (error) {
-            this.logger.error('Error downloading logs:', {
-                message: error.message,
-                stack: error.stack
-            });
-        }
+    async downloadAllProjects() {
+        await Promise.allSettled(
+            this.projectRunners.map(runner => runner.downloadLogs())
+        );
     }
 
-    async cleanupOldFiles() {
-        try {
-            this.logger.info('Starting old file cleanup...');
-            await this.fileManager.cleanupOldFiles();
-
-            const files = await this.fileManager.getFileList();
-            this.logger.info('Current files:', {
-                count: files.length,
-                totalSize: files.reduce((sum, f) => sum + f.size, 0),
-                oldestFile: files.length > 0 ? files[files.length - 1].name : 'none'
-            });
-
-        } catch (error) {
-            this.logger.error('Cleanup error:', error.message);
-        }
+    async cleanupAllProjects() {
+        await Promise.allSettled(
+            this.projectRunners.map(runner => runner.cleanupOldFiles())
+        );
     }
 
     startScheduledJobs() {
-        this.downloadJob = cron.schedule(this.config.schedule.downloadInterval, async () => {
-            await this.downloadLogs();
-        }, {
-            scheduled: true,
-            timezone: 'Europe/Rome'
-        });
+        this.scheduledJobs = this.projectRunners.map(runner => {
+            const { downloadInterval, cleanupInterval } = runner.config.schedule;
+            const downloadJob = cron.schedule(downloadInterval, async () => {
+                await runner.downloadLogs();
+            }, {
+                scheduled: true,
+                timezone: 'Europe/Rome'
+            });
 
-        this.cleanupJob = cron.schedule(this.config.schedule.cleanupInterval, async () => {
-            await this.cleanupOldFiles();
-        }, {
-            scheduled: true,
-            timezone: 'Europe/Rome'
+            const cleanupJob = cron.schedule(cleanupInterval, async () => {
+                await runner.cleanupOldFiles();
+            }, {
+                scheduled: true,
+                timezone: 'Europe/Rome'
+            });
+
+            return {
+                project: runner.project,
+                downloadInterval,
+                cleanupInterval,
+                downloadJob,
+                cleanupJob
+            };
         });
 
         this.logger.info('Scheduled jobs started', {
-            downloadInterval: this.config.schedule.downloadInterval,
-            cleanupInterval: this.config.schedule.cleanupInterval,
+            projects: this.scheduledJobs.map(({ project, downloadInterval, cleanupInterval }) => ({
+                project,
+                downloadInterval,
+                cleanupInterval
+            })),
             credentialRefreshIntervalMinutes: this.config.aws.credentialRefreshIntervalMinutes
         });
 
         this.startCredentialRefreshJob();
+        this.registerShutdownHandlers();
+    }
+
+    stopScheduledJobs() {
+        for (const job of this.scheduledJobs) {
+            job.downloadJob.stop();
+            job.cleanupJob.stop();
+        }
+        this.scheduledJobs = [];
+    }
+
+    registerShutdownHandlers() {
+        if (this.shutdownHandlersRegistered) {
+            return;
+        }
+
+        this.shutdownHandlersRegistered = true;
 
         const shutdown = async () => {
             try {
                 this.logger.info('Shutting down service...');
-                this.downloadJob.stop();
-                this.cleanupJob.stop();
+                this.stopScheduledJobs();
                 this.stopCredentialRefreshJob();
 
                 if (this.monitorServer) {
@@ -267,7 +297,7 @@ class CloudWatchLogDownloader {
 
     async start() {
         await this.init();
-        await this.downloadLogs();
+        await this.downloadAllProjects();
         this.startScheduledJobs();
         this.logger.info('Service running. Press Ctrl+C to stop.');
         this.printMonitorUrls();

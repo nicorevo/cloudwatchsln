@@ -35,13 +35,17 @@ class CloudWatchClient {
         return [];
     }
 
-    async init() {
+    async init(options = {}) {
         if (!this.authManager || !this.authManager.isAuthenticated()) {
             throw new Error('AwsAuthManager not authenticated');
         }
 
         await this.rebuildClient();
-        await this.testCredentials();
+
+        if (!options.skipCredentialTest) {
+            await this.testCredentials();
+        }
+
         this.initialized = true;
     }
 
