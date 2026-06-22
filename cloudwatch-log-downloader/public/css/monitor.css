@@ -47,13 +47,18 @@ summary:focus-visible {
     display: none !important;
 }
 
-.eyebrow {
+.eyebrow,
+.dashboard-brand {
     margin: 0 0 0.4rem;
     color: var(--accent);
     font-size: 0.75rem;
     font-weight: 700;
     letter-spacing: 0.12em;
     text-transform: uppercase;
+}
+
+.dashboard-brand {
+    margin: 0;
 }
 
 .dashboard-view {
@@ -64,24 +69,18 @@ summary:focus-visible {
 
 .dashboard-header {
     display: flex;
-    align-items: flex-end;
+    align-items: center;
     justify-content: space-between;
-    gap: 2rem;
-    padding-bottom: 1.5rem;
+    gap: 1rem;
+    padding-bottom: 0.85rem;
     border-bottom: 1px solid var(--border);
 }
 
-.dashboard-header h1,
 .project-heading h1 {
     margin: 0;
     font-size: clamp(1.75rem, 4vw, 2.75rem);
     line-height: 1.05;
     letter-spacing: -0.035em;
-}
-
-.dashboard-intro {
-    margin: 0.75rem 0 0;
-    color: var(--muted);
 }
 
 .refresh-meta {
@@ -91,14 +90,6 @@ summary:focus-visible {
     color: var(--muted);
     font-size: 0.85rem;
     white-space: nowrap;
-}
-
-.status-dot {
-    width: 0.55rem;
-    height: 0.55rem;
-    border-radius: 50%;
-    background: var(--accent);
-    box-shadow: 0 0 0 0.25rem var(--accent-soft);
 }
 
 .dashboard-status {
@@ -143,6 +134,22 @@ summary:focus-visible {
 
 .project-card.status-error {
     border-top-color: var(--error);
+}
+
+.project-card.has-unread-exception {
+    border-color: var(--error);
+    border-top-color: var(--error);
+    background: rgba(244, 122, 122, 0.13);
+    box-shadow: 0 0 0 1px rgba(244, 122, 122, 0.3);
+}
+
+.project-card.has-unread-exception:hover {
+    border-color: var(--error);
+    background: rgba(244, 122, 122, 0.18);
+}
+
+.project-card.has-unread-exception .project-status {
+    color: var(--error);
 }
 
 .project-card-header,
@@ -416,9 +423,14 @@ summary:focus-visible {
     }
 
     .dashboard-header {
-        align-items: flex-start;
-        flex-direction: column;
-        gap: 1rem;
+        align-items: center;
+        flex-direction: row;
+        gap: 0.75rem;
+    }
+
+    .refresh-meta {
+        white-space: normal;
+        text-align: right;
     }
 
     .project-toolbar {

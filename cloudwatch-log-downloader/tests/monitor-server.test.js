@@ -309,7 +309,7 @@ test('monitor server serves frontend index.html', async () => {
     try {
         const response = await request(`${server.baseUrl}/`);
         assert.equal(response.statusCode, 200);
-        assert.match(response.body, /Console monitoraggio/);
+        assert.match(response.body, /CloudWatch Log Downloader/);
     } finally {
         await server.stop();
     }

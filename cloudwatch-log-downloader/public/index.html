@@ -3,19 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Console monitoraggio CloudWatch</title>
+    <title>CloudWatch Log Downloader</title>
     <link rel="stylesheet" href="/css/monitor.css">
 </head>
 <body>
     <main id="dashboard-view" class="dashboard-view">
         <header class="dashboard-header">
-            <div>
-                <p class="eyebrow">CloudWatch Log Downloader</p>
-                <h1>Console monitoraggio</h1>
-                <p class="dashboard-intro">Stato delle eccezioni rilevate nei progetti configurati.</p>
-            </div>
+            <p class="dashboard-brand">CloudWatch Log Downloader</p>
             <div class="refresh-meta">
-                <span class="status-dot" aria-hidden="true"></span>
                 <span id="dashboard-updated-at">Aggiornamento in corso…</span>
             </div>
         </header>
@@ -23,7 +18,7 @@
         <div id="dashboard-status" class="dashboard-status" aria-live="polite">
             Caricamento progetti…
         </div>
-        <section id="project-grid" class="project-grid" aria-label="Progetti monitorati"></section>
+        <section id="project-grid" class="project-grid" aria-label="Elenco progetti"></section>
     </main>
 
     <section id="project-detail-view" class="project-detail-view hidden" aria-label="Dettaglio progetto">

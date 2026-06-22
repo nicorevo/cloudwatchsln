@@ -1,4 +1,5 @@
 const STORAGE_KEY = 'monitor.selectedProject';
+const ACKNOWLEDGED_STORAGE_KEY = 'monitor.acknowledgedExceptions';
 const DISPLAY_TIMEZONE = 'Europe/Rome';
 
 const state = {
@@ -7,6 +8,7 @@ const state = {
     projects: [],
     selectedId: null,
     lastTree: null,
+    acknowledgedExceptions: {},
     refreshSeconds: 30,
     refreshTimer: null
 };
@@ -103,6 +105,70 @@ function getStatusLabel(status) {
     }[status] || 'Sconosciuto';
 }
 
+function loadAcknowledgedExceptions() {
+    try {
+        const stored = sessionStorage.getItem(ACKNOWLEDGED_STORAGE_KEY);
+        if (!stored) {
+            return {};
+        }
+
+        const parsed = JSON.parse(stored);
+        return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+            ? parsed
+            : {};
+    } catch (error) {
+        return {};
+    }
+}
+
+function saveAcknowledgedExceptions() {
+    try {
+        sessionStorage.setItem(
+            ACKNOWLEDGED_STORAGE_KEY,
+            JSON.stringify(state.acknowledgedExceptions)
+        );
+    } catch (error) {
+        // La dashboard continua a funzionare anche se lo storage è disabilitato.
+    }
+}
+
+function parseTimestamp(value) {
+    const timestamp = Date.parse(value);
+    return Number.isFinite(timestamp) ? timestamp : null;
+}
+
+function hasUnreadException(project) {
+    const latest = parseTimestamp(project.metrics?.latestExceptionAt);
+    if (latest === null) {
+        return false;
+    }
+
+    const acknowledged = parseTimestamp(state.acknowledgedExceptions[project.id]);
+    return acknowledged === null || latest > acknowledged;
+}
+
+function establishAcknowledgementBaseline(projects) {
+    let changed = false;
+
+    projects.forEach(project => {
+        if (!Object.hasOwn(state.acknowledgedExceptions, project.id)) {
+            state.acknowledgedExceptions[project.id] =
+                project.metrics?.latestExceptionAt || null;
+            changed = true;
+        }
+    });
+
+    if (changed) {
+        saveAcknowledgedExceptions();
+    }
+}
+
+function acknowledgeProjectExceptions(project) {
+    state.acknowledgedExceptions[project.id] =
+        project.metrics?.latestExceptionAt || null;
+    saveAcknowledgedExceptions();
+}
+
 function createMetric(label, value) {
     const metric = createElement('div', 'project-metric');
     metric.append(
@@ -113,14 +179,24 @@ function createMetric(label, value) {
 }
 
 function createProjectCard(project) {
-    const button = createElement('button', `project-card status-${project.status}`);
+    const unread = project.status !== 'error' && hasUnreadException(project);
+    const cardClasses = [
+        'project-card',
+        `status-${project.status}`,
+        unread ? 'has-unread-exception' : ''
+    ].filter(Boolean).join(' ');
+    const button = createElement('button', cardClasses);
     button.type = 'button';
     button.dataset.projectId = project.id;
 
     const header = createElement('div', 'project-card-header');
     header.append(
         createElement('span', 'project-name', project.id),
-        createElement('span', 'project-status', getStatusLabel(project.status))
+        createElement(
+            'span',
+            'project-status',
+            unread ? 'Nuova eccezione' : getStatusLabel(project.status)
+        )
     );
     button.appendChild(header);
 
@@ -151,6 +227,13 @@ function createProjectCard(project) {
     }
 
     button.addEventListener('click', () => {
+        acknowledgeProjectExceptions(project);
+        button.classList.remove('has-unread-exception');
+        const statusLabel = button.querySelector('.project-status');
+        if (statusLabel) {
+            statusLabel.textContent = getStatusLabel(project.status);
+        }
+
         showProjectDetail(project.id).catch(error => {
             setPlaceholder(treeContainer, `Errore apertura progetto: ${error.message}`);
         });
@@ -162,15 +245,18 @@ function createProjectCard(project) {
 function renderDashboard(payload) {
     state.projects = payload.projects || [];
     state.refreshSeconds = payload.refreshSeconds || state.refreshSeconds;
-    dashboardUpdatedAt.textContent = `Aggiornato alle ${formatTime(payload.generatedAt)}`;
+    dashboardUpdatedAt.textContent = `Aggiornato ${formatDateTime(payload.generatedAt)}`;
     projectGrid.replaceChildren();
 
     if (state.projects.length === 0) {
+        dashboardStatus.classList.remove('hidden');
         dashboardStatus.textContent = 'Nessun progetto configurato.';
         return;
     }
 
-    dashboardStatus.textContent = `${state.projects.length} progetti monitorati`;
+    establishAcknowledgementBaseline(state.projects);
+    dashboardStatus.classList.add('hidden');
+    dashboardStatus.textContent = '';
     state.projects.forEach(project => {
         projectGrid.appendChild(createProjectCard(project));
     });
@@ -330,6 +416,7 @@ async function refreshDashboard() {
         const payload = await fetchJson('/api/v1/dashboard');
         renderDashboard(payload);
     } catch (error) {
+        dashboardStatus.classList.remove('hidden');
         dashboardStatus.textContent = `Errore caricamento cruscotto: ${error.message}`;
         projectGrid.replaceChildren();
     }
@@ -433,6 +520,7 @@ async function handleProjectChange(nextProject) {
 }
 
 async function initMonitorUi() {
+    state.acknowledgedExceptions = loadAcknowledgedExceptions();
     backToDashboard.addEventListener('click', () => {
         showDashboard();
     });
