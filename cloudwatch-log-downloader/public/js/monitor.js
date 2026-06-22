@@ -1,4 +1,5 @@
 const STORAGE_KEY = 'monitor.selectedProject';
+const DISPLAY_TIMEZONE = 'Europe/Rome';
 
 const state = {
     view: 'dashboard',
@@ -62,6 +63,7 @@ function formatTime(value) {
     }
 
     return new Date(value).toLocaleTimeString('it-IT', {
+        timeZone: DISPLAY_TIMEZONE,
         hour: '2-digit',
         minute: '2-digit',
         second: '2-digit'
@@ -74,6 +76,7 @@ function formatDateTime(value) {
     }
 
     return new Date(value).toLocaleString('it-IT', {
+        timeZone: DISPLAY_TIMEZONE,
         dateStyle: 'short',
         timeStyle: 'medium'
     });
@@ -116,7 +119,7 @@ function createProjectCard(project) {
 
     const header = createElement('div', 'project-card-header');
     header.append(
-        createElement('h2', 'project-name', project.id),
+        createElement('span', 'project-name', project.id),
         createElement('span', 'project-status', getStatusLabel(project.status))
     );
     button.appendChild(header);
@@ -293,12 +296,31 @@ async function loadExceptionDetail(exceptionId) {
         return;
     }
 
+    const requestedProject = state.selectedProject;
+
     try {
         const detail = await fetchJson(
-            projectApiPath(state.selectedProject, `/exceptions/${encodeURIComponent(exceptionId)}`)
+            projectApiPath(requestedProject, `/exceptions/${encodeURIComponent(exceptionId)}`)
         );
+
+        if (
+            state.view !== 'project-detail'
+            || state.selectedProject !== requestedProject
+            || state.selectedId !== exceptionId
+        ) {
+            return;
+        }
+
         renderDetail(detail);
     } catch (error) {
+        if (
+            state.view !== 'project-detail'
+            || state.selectedProject !== requestedProject
+            || state.selectedId !== exceptionId
+        ) {
+            return;
+        }
+
         resetDetailPanel(`Errore caricamento dettaglio: ${error.message}`);
     }
 }
@@ -319,11 +341,21 @@ async function refreshTree() {
         return;
     }
 
+    const requestedProject = state.selectedProject;
+
     try {
         const [health, tree] = await Promise.all([
-            fetchJson(projectApiPath(state.selectedProject, '/health')),
-            fetchJson(projectApiPath(state.selectedProject, '/exceptions/tree'))
+            fetchJson(projectApiPath(requestedProject, '/health')),
+            fetchJson(projectApiPath(requestedProject, '/exceptions/tree'))
         ]);
+
+        if (
+            state.view !== 'project-detail'
+            || state.selectedProject !== requestedProject
+        ) {
+            return;
+        }
+
         state.refreshSeconds = health.treeRefreshSeconds || state.refreshSeconds;
         state.lastTree = tree;
         renderTree(tree);
@@ -339,6 +371,13 @@ async function refreshTree() {
             }
         }
     } catch (error) {
+        if (
+            state.view !== 'project-detail'
+            || state.selectedProject !== requestedProject
+        ) {
+            return;
+        }
+
         setPlaceholder(treeContainer, `Errore caricamento eccezioni: ${error.message}`);
     }
 }

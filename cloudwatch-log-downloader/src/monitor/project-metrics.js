@@ -11,13 +11,17 @@ const LogFileCache = require('./log-file-cache');
 const DEFAULT_TIMEZONE = 'Europe/Rome';
 const LAST_HOUR_MS = 60 * 60 * 1000;
 
-function buildLocalDateKey(date, timezone) {
-    const parts = new Intl.DateTimeFormat('en-CA', {
+function createLocalDateFormatter(timezone) {
+    return new Intl.DateTimeFormat('en-CA', {
         timeZone: timezone,
         year: 'numeric',
         month: '2-digit',
         day: '2-digit'
-    }).formatToParts(date);
+    });
+}
+
+function buildLocalDateKey(date, timezone, formatter = createLocalDateFormatter(timezone)) {
+    const parts = formatter.formatToParts(date);
     const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
 
     return `${values.year}-${values.month}-${values.day}`;
@@ -44,7 +48,8 @@ class ProjectMetrics {
         const timezone = options.timezone || DEFAULT_TIMEZONE;
         const nowTime = now.getTime();
         const lastHourStart = nowTime - LAST_HOUR_MS;
-        const todayKey = buildLocalDateKey(now, timezone);
+        const dateFormatter = createLocalDateFormatter(timezone);
+        const todayKey = buildLocalDateKey(now, timezone, dateFormatter);
         const entries = await fs.readdir(this.logDirectory);
         const exceptionFiles = entries.filter(filename =>
             isExceptionLogFilename(this.filePrefix, filename)
@@ -86,7 +91,7 @@ class ProjectMetrics {
                     lastHourExceptionCount += 1;
                 }
 
-                if (buildLocalDateKey(timestamp, timezone) === todayKey) {
+                if (buildLocalDateKey(timestamp, timezone, dateFormatter) === todayKey) {
                     todayExceptionCount += 1;
                 }
             }

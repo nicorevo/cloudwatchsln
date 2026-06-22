@@ -60,6 +60,21 @@ test('monitor.js evita rendering HTML diretto di dati API', () => {
     assert.match(js, /replaceChildren/);
 });
 
+test('monitor.js ignora risposte dettaglio diventate obsolete', () => {
+    const js = fs.readFileSync(path.join(PUBLIC_DIR, 'js', 'monitor.js'), 'utf8');
+
+    assert.match(js, /const requestedProject = state\.selectedProject/);
+    assert.match(js, /state\.selectedProject !== requestedProject/);
+    assert.match(js, /state\.view !== 'project-detail'/);
+});
+
+test('monitor.js usa contenuto valido e fuso Europe Rome nelle card', () => {
+    const js = fs.readFileSync(path.join(PUBLIC_DIR, 'js', 'monitor.js'), 'utf8');
+
+    assert.match(js, /createElement\('span', 'project-name'/);
+    assert.match(js, /timeZone: DISPLAY_TIMEZONE/);
+});
+
 test('monitor.css definisce griglia card, focus e layout responsive', () => {
     const css = fs.readFileSync(path.join(PUBLIC_DIR, 'css', 'monitor.css'), 'utf8');
 
