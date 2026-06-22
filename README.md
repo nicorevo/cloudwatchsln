@@ -1,6 +1,6 @@
 # CloudWatch Log Downloader
 
-**Download AWS CloudWatch logs to local files**, with automatic rolling, exception extraction, and an **Exception Monitor** — a web UI to browse errors and surrounding context.
+**Download AWS CloudWatch logs to local files**, with automatic rolling, exception extraction, and a **monitoring dashboard** — a web UI to compare projects and inspect errors with surrounding context.
 
 Built for teams who want to **observe microservices in UAT/prod** without the AWS Console: grep, scripts, offline debugging, or optional AI-assisted pattern tuning on plain-text files.
 
@@ -11,7 +11,7 @@ Built for teams who want to **observe microservices in UAT/prod** without the AW
   cloudwatch-log-downloader  ──►  ./logs/{filePrefix}_*.log
            │                      ./logs/{filePrefix}-exceptions_*.log
            ▼
-  http://127.0.0.1:3847  (project selector + exception tree + ±10 line context)
+  http://127.0.0.1:3847  (project dashboard + exception tree + ±10 line context)
 ```
 
 ---
@@ -27,7 +27,7 @@ Built for teams who want to **observe microservices in UAT/prod** without the AW
 | **Exceptions** | Configurable patterns → dedicated `-exceptions_*.log` files |
 | **Retention** | Automatic cleanup; `preserveExceptionPairs` keeps exception/main pairs |
 | **AWS SSO** | Auth at startup + STS credential refresh every ~55 min |
-| **Exception Monitor** | Local UI + JSON REST API scoped by project (`/api/v1/projects/{project}/…`) |
+| **Monitoring dashboard** | Per-project counters, drill-down, and JSON REST API (`/api/v1/dashboard`) |
 
 ---
 
@@ -182,18 +182,21 @@ Generic starter patterns:
 
 ---
 
-## Exception Monitor
+## Monitoring dashboard
 
 With `monitor.enabled: true` (default in the sample):
 
 | URL | Description |
 |-----|-------------|
-| `http://127.0.0.1:3847/` | Exception tree + context panel (project dropdown) |
+| `http://127.0.0.1:3847/` | Project cards → exception tree → context panel |
+| `GET /api/v1/dashboard` | Aggregated counters for every project |
 | `GET /api/v1/projects` | List configured projects |
 | `GET /api/v1/projects/{project}/health` | Monitor status for one project |
 | `GET /api/v1/projects/{project}/exceptions/tree` | JSON tree: files → exceptions |
 | `GET /api/v1/projects/{project}/exceptions/:id` | Exception + before/after lines from main file |
 | `GET /api/v1/health` | Monitor status |
+
+Each project card reports retained exceptions, exceptions from the last hour, exceptions today in `Europe/Rome`, files containing exceptions, and the latest exception timestamp. Counts are calculated from the exception files currently retained on disk.
 
 Legacy routes (`GET /api/v1/exceptions/*`) respond with **410 Gone**.
 
@@ -227,8 +230,8 @@ cloudwatch-log-downloader/
 │   ├── aws-auth-manager.js      # SSO + STS refresh
 │   ├── cloudwatch-client.js     # FilterLogEvents
 │   ├── file-manager.js          # Rolling + exceptions + retention
-│   └── monitor/                 # HTTP server + exception UI
-├── public/                      # Exception Monitor frontend
+│   └── monitor/                 # HTTP server, project metrics, exception index
+├── public/                      # Dashboard and exception detail frontend
 ├── config.sample.json           # Committed template (multi-project)
 ├── config.prod.json             # Local (gitignored)
 └── tests/
