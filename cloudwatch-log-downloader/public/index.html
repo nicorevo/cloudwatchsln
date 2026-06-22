@@ -1,45 +1,77 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="it">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Exception Monitor</title>
+    <title>Console monitoraggio CloudWatch</title>
     <link rel="stylesheet" href="/css/monitor.css">
 </head>
 <body>
-    <div class="app">
-        <aside class="sidebar">
-            <header class="sidebar-header">
-                <div class="sidebar-title-row">
-                    <h1>Exceptions</h1>
-                    <label class="project-select-label" for="project-select">
-                        <span class="sr-only">Project</span>
-                        <select id="project-select" class="project-select" aria-label="Project"></select>
-                    </label>
-                </div>
-                <div class="sidebar-meta">
-                    <span id="exception-count" class="badge">0</span>
+    <main id="dashboard-view" class="dashboard-view">
+        <header class="dashboard-header">
+            <div>
+                <p class="eyebrow">CloudWatch Log Downloader</p>
+                <h1>Console monitoraggio</h1>
+                <p class="dashboard-intro">Stato delle eccezioni rilevate nei progetti configurati.</p>
+            </div>
+            <div class="refresh-meta">
+                <span class="status-dot" aria-hidden="true"></span>
+                <span id="dashboard-updated-at">Aggiornamento in corso…</span>
+            </div>
+        </header>
+
+        <div id="dashboard-status" class="dashboard-status" aria-live="polite">
+            Caricamento progetti…
+        </div>
+        <section id="project-grid" class="project-grid" aria-label="Progetti monitorati"></section>
+    </main>
+
+    <section id="project-detail-view" class="project-detail-view hidden" aria-label="Dettaglio progetto">
+        <header class="project-toolbar">
+            <button id="back-to-dashboard" class="back-button" type="button">
+                <span aria-hidden="true">←</span>
+                Torna al cruscotto
+            </button>
+            <div class="project-heading">
+                <p class="eyebrow">Dettaglio progetto</p>
+                <h1 id="project-detail-title">Eccezioni</h1>
+            </div>
+            <label class="project-select-label" for="project-select">
+                <span class="sr-only">Seleziona progetto</span>
+                <select id="project-select" class="project-select" aria-label="Seleziona progetto"></select>
+            </label>
+        </header>
+
+        <div class="monitor-layout">
+            <aside class="sidebar">
+                <header class="sidebar-header">
+                    <div class="sidebar-title-row">
+                        <h2>Eccezioni</h2>
+                        <span id="exception-count" class="badge">0</span>
+                    </div>
                     <span id="last-refresh" class="muted">—</span>
-                </div>
-            </header>
-            <div id="exception-tree" class="tree">
-                <p class="placeholder">Loading exception tree...</p>
-            </div>
-        </aside>
-        <main class="detail-panel">
-            <div id="detail-empty" class="detail-empty">
-                Select an exception from the tree
-            </div>
-            <div id="detail-content" class="detail-content hidden">
-                <header class="detail-header">
-                    <h2 id="detail-title">Exception</h2>
-                    <div id="detail-meta" class="detail-meta"></div>
                 </header>
-                <div id="detail-warning" class="detail-warning hidden"></div>
-                <pre id="detail-log" class="detail-log"></pre>
-            </div>
-        </main>
-    </div>
+                <div id="exception-tree" class="tree" aria-live="polite">
+                    <p class="placeholder">Caricamento eccezioni…</p>
+                </div>
+            </aside>
+
+            <section class="detail-panel" aria-label="Contesto eccezione">
+                <div id="detail-empty" class="detail-empty">
+                    Seleziona un'eccezione dall'albero.
+                </div>
+                <div id="detail-content" class="detail-content hidden">
+                    <header class="detail-header">
+                        <h2 id="detail-title">Eccezione</h2>
+                        <div id="detail-meta" class="detail-meta"></div>
+                    </header>
+                    <div id="detail-warning" class="detail-warning hidden"></div>
+                    <pre id="detail-log" class="detail-log"></pre>
+                </div>
+            </section>
+        </div>
+    </section>
+
     <script src="/js/monitor.js"></script>
 </body>
 </html>
