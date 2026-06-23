@@ -28,6 +28,7 @@ Built for teams who want to **observe microservices in UAT/prod** without the AW
 | **Retention** | Automatic cleanup; `preserveExceptionPairs` keeps exception/main pairs |
 | **AWS SSO** | Auth at startup + STS credential refresh every ~55 min |
 | **Monitoring dashboard** | Per-project counters, drill-down, and JSON REST API (`/api/v1/dashboard`) |
+| **Live log tail** | Follow locally collected logs for one project at `/tail`, with exception highlighting |
 
 ---
 
@@ -189,14 +190,18 @@ With `monitor.enabled: true` (default in the sample):
 | URL | Description |
 |-----|-------------|
 | `http://127.0.0.1:3847/` | Project cards → exception tree → context panel |
+| `http://127.0.0.1:3847/tail` | Live tail of locally collected logs for one project |
 | `GET /api/v1/dashboard` | Aggregated counters for every project |
 | `GET /api/v1/projects` | List configured projects |
+| `GET /api/v1/projects/{project}/tail` | Initial or incremental log tail using an opaque cursor |
 | `GET /api/v1/projects/{project}/health` | Monitor status for one project |
 | `GET /api/v1/projects/{project}/exceptions/tree` | JSON tree: files → exceptions |
 | `GET /api/v1/projects/{project}/exceptions/:id` | Exception + before/after lines from main file |
 | `GET /api/v1/health` | Monitor status |
 
 Each project card reports retained exceptions, exceptions from the last hour, exceptions today in `Europe/Rome`, files containing exceptions, and the latest exception timestamp. Counts are calculated from the exception files currently retained on disk.
+
+The tail page reads the main log files already written by the downloader. It polls the local API every two seconds, but new events only appear after the project's configured `schedule.downloadInterval` has downloaded them from CloudWatch. It does not generate extra AWS requests.
 
 Legacy routes (`GET /api/v1/exceptions/*`) respond with **410 Gone**.
 
