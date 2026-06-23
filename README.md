@@ -10,6 +10,7 @@ Built for teams who want to **observe microservices in UAT/prod** without the AW
            ▼
   cloudwatch-log-downloader  ──►  ./logs/{filePrefix}_*.log
            │                      ./logs/{filePrefix}-exceptions_*.log
+           ├───────────────────►  Slack Incoming Webhook (optional)
            ▼
   http://127.0.0.1:3847  (project dashboard + exception tree + ±10 line context)
 ```
@@ -25,6 +26,7 @@ Built for teams who want to **observe microservices in UAT/prod** without the AW
 | **Multi log group** | A `logGroups[]` array per project — typical on EKS: one path per pod/deployment |
 | **Rolling files** | One file per minute (configurable), append within the same minute |
 | **Exceptions** | Configurable patterns → dedicated `-exceptions_*.log` files |
+| **Exception notifications** | Extensible per-project channels with Slack Incoming Webhook support |
 | **Retention** | Automatic cleanup; `preserveExceptionPairs` keeps exception/main pairs |
 | **AWS SSO** | Auth at startup + STS credential refresh every ~55 min |
 | **Monitoring dashboard** | Per-project counters, drill-down, and JSON REST API (`/api/v1/dashboard`) |
@@ -82,6 +84,14 @@ Essential fields:
       "excludeExceptionPatterns": [
         "Known harmless error"
       ],
+      "channels": [
+        {
+          "id": "operations-slack",
+          "type": "slack",
+          "enabled": false,
+          "webhookUrlEnv": "MY_APPLICATION_SLACK_WEBHOOK_URL"
+        }
+      ],
       "schedule": {
         "downloadInterval": "*/1 * * * *",
         "cleanupInterval": "*/60 * * * *"
@@ -109,6 +119,7 @@ Add more entries to `cloudwatch[]` to monitor additional services in the same pr
 | `cloudwatch[].logGroups[]` | CloudWatch paths to query (preferred on EKS) |
 | `cloudwatch[].exceptionPatterns[]` | Substrings copied into `-exceptions_*` files |
 | `cloudwatch[].excludeExceptionPatterns[]` | Optional substrings that suppress matching exceptions |
+| `cloudwatch[].channels[]` | Optional destinations notified for every newly detected exception |
 | `cloudwatch[].files.filePrefix` | Filename prefix under `./logs/` (must be unique per entry) |
 | `monitor.enabled` | Exception UI at `http://127.0.0.1:3847` |
 
@@ -122,6 +133,7 @@ Other useful fields in `config.sample.json`:
 | `aws` | `loginOnStartupIfNeeded` | `false` | Opens SSO browser if session is missing |
 | `cloudwatch[]` | `monitorPatterns` | `[]` | Empty = all lines in the main file |
 | `cloudwatch[]` | `excludeExceptionPatterns` | `[]` | Excludes false positives matched by `exceptionPatterns` |
+| `cloudwatch[]` | `channels` | `[]` | Notification destinations; enabled Slack channels require their webhook environment variable |
 | `cloudwatch[]` | `schedule.downloadInterval` | `*/1 * * * *` | Download cron per project (Europe/Rome) |
 | `cloudwatch[]` | `files.preserveExceptionPairs` | `true` | Do not delete exception/main pairs |
 | `cloudwatch[]` | `logging.level` | `info` | Service log level uses the **first** entry's `logging.level` |
@@ -200,6 +212,52 @@ after changing either list.
 
 ---
 
+## Slack exception notifications
+
+Each project can notify one or more channels independently from the web UI.
+Slack uses an Incoming Webhook associated with its destination channel.
+
+Keep the webhook outside JSON configuration:
+
+```bash
+export MY_APPLICATION_SLACK_WEBHOOK_URL='https://hooks.slack.com/services/...'
+```
+
+Then enable the project channel:
+
+```json
+{
+  "channels": [
+    {
+      "id": "operations-slack",
+      "type": "slack",
+      "enabled": true,
+      "webhookUrlEnv": "MY_APPLICATION_SLACK_WEBHOOK_URL"
+    }
+  ]
+}
+```
+
+Every detected exception produces a separate message containing project,
+environment, timestamp, log group and log stream. It then shows up to 5
+preceding lines, the complete exception marked with `[ECCEZIONE]`, and up to 5
+following lines from the same CloudWatch log stream. Context lines contain
+only UTC time (`HH:mm:ss`) and the normalized application message. The service
+waits at most 30 seconds for the following context.
+
+The exception is never truncated. If the message exceeds Slack's configured
+limit, complete context lines are removed starting with those furthest from
+the exception. If the header and complete exception alone do not fit, delivery
+fails locally without calling Slack.
+
+Delivery failures never stop log downloads. Slack retries transient failures
+up to three times, while persistent deduplication prevents normal process
+restarts from sending the same event again. Logs are forwarded to an external
+service: configure patterns and Slack channel access according to the
+sensitivity of application data.
+
+---
+
 ## Monitoring dashboard
 
 With `monitor.enabled: true` (default in the sample):
@@ -252,6 +310,7 @@ cloudwatch-log-downloader/
 │   ├── aws-auth-manager.js      # SSO + STS refresh
 │   ├── cloudwatch-client.js     # FilterLogEvents
 │   ├── file-manager.js          # Rolling + exceptions + retention
+│   ├── notifications/           # Channel dispatch, Slack, context, dedup state
 │   └── monitor/                 # HTTP server, project metrics, exception index
 ├── public/                      # Dashboard and exception detail frontend
 ├── config.sample.json           # Committed template (multi-project)
@@ -273,6 +332,17 @@ npm run start:prod
 **0 events downloaded** — check `cloudwatch[].logGroups[]`, region, and AWS profile in the CloudWatch Console.
 
 **BrokenPipeError during `aws sso login`** — often harmless; verify with `aws sts get-caller-identity --profile ...`.
+
+**Slack notifications do not start**
+
+- set `cloudwatch[].channels[].enabled` to `true`;
+- export the exact variable named by `webhookUrlEnv` before starting Node;
+- restart the process after config or environment changes;
+- check that the URL is an HTTPS Incoming Webhook under `hooks.slack.com/services/`.
+
+The service intentionally fails startup when an enabled Slack channel has a
+missing or invalid webhook variable. Never put the webhook URL directly in
+JSON or commit it to the repository.
 
 ---
 
