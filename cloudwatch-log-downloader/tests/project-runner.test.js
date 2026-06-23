@@ -22,6 +22,7 @@ const PROJECT_ENTRY = {
     monitorPatterns: [],
     exceptionPatterns: [' ERROR '],
     excludeExceptionPatterns: ['Known harmless error'],
+    channels: [],
     schedule: {
         downloadInterval: '*/1 * * * *',
         cleanupInterval: '*/60 * * * *'
@@ -66,6 +67,7 @@ test('buildSyntheticProjectConfig shaped come config monoprogetto', () => {
         config.cloudwatch.excludeExceptionPatterns,
         ['Known harmless error']
     );
+    assert.deepEqual(config.channels, []);
     assert.deepEqual(config.schedule, PROJECT_ENTRY.schedule);
     assert.deepEqual(config.files, PROJECT_ENTRY.files);
     assert.deepEqual(config.logging, PROJECT_ENTRY.logging);
@@ -102,6 +104,93 @@ test('ProjectRunner downloadLogs scrive eventi e aggiorna lastProcessedTime', as
     assert.ok(runner.lastProcessedTime > startTime);
     assert.equal(logger.calls.some(call => call.message === 'Download complete: 1 events processed'), true);
     assert.equal(logger.calls.some(call => call.data?.project === 'prj01'), true);
+});
+
+test('ProjectRunner passa gli eventi al notification manager dopo la scrittura', async () => {
+    const order = [];
+    const events = [{ timestamp: Date.now(), message: 'ERROR event-1' }];
+    const runner = new ProjectRunner(ROOT_CONFIG, PROJECT_ENTRY, {}, createLogger(), {
+        cloudWatchClient: {
+            async fetchLogsPaginated() {
+                return events;
+            }
+        },
+        fileManager: {
+            async writeLogsToFile() {
+                order.push('file');
+            }
+        },
+        notificationManager: {
+            async init() {},
+            ingest(received) {
+                assert.equal(received, events);
+                order.push('notification');
+            },
+            async close() {}
+        }
+    });
+
+    await runner.downloadLogs();
+
+    assert.deepEqual(order, ['file', 'notification']);
+});
+
+test('ProjectRunner isola errori sincroni del notification manager', async () => {
+    const startTime = Date.now() - 60000;
+    const logger = createLogger();
+    const runner = new ProjectRunner(ROOT_CONFIG, PROJECT_ENTRY, {}, logger, {
+        cloudWatchClient: {
+            async fetchLogsPaginated() {
+                return [{ timestamp: Date.now(), message: 'ERROR event-1' }];
+            }
+        },
+        fileManager: {
+            async writeLogsToFile() {}
+        },
+        notificationManager: {
+            async init() {},
+            ingest() {
+                throw new Error('notification failure');
+            },
+            async close() {}
+        },
+        lastProcessedTime: startTime
+    });
+
+    await runner.downloadLogs();
+
+    assert.ok(runner.lastProcessedTime > startTime);
+    assert.ok(logger.calls.some(call =>
+        call.level === 'error'
+        && call.message === 'Errore durante la gestione delle notifiche'
+    ));
+});
+
+test('ProjectRunner inizializza e chiude il notification manager', async () => {
+    const calls = [];
+    const runner = new ProjectRunner(ROOT_CONFIG, PROJECT_ENTRY, {}, createLogger(), {
+        cloudWatchClient: {
+            async init() { calls.push('cloudwatch-init'); },
+            async fetchLogsPaginated() { return []; }
+        },
+        fileManager: {},
+        notificationManager: {
+            async init() { calls.push('notification-init'); },
+            ingest() {},
+            async close(options) {
+                calls.push(`notification-close-${options.timeoutMs}`);
+            }
+        }
+    });
+
+    await runner.init();
+    await runner.close({ timeoutMs: 15000 });
+
+    assert.deepEqual(calls, [
+        'cloudwatch-init',
+        'notification-init',
+        'notification-close-15000'
+    ]);
 });
 
 test('ProjectRunner downloadLogs aggiorna lastProcessedTime anche senza eventi', async () => {

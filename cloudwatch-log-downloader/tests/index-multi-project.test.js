@@ -114,6 +114,19 @@ test('cleanupAllProjects invoca cleanupOldFiles su ogni runner', async () => {
     assert.deepEqual(calls.sort(), ['a', 'b']);
 });
 
+test('closeProjectRunners chiude tutti i manager di notifica', async () => {
+    const downloader = new CloudWatchLogDownloader({ configPath: MULTI_CONFIG });
+    const calls = [];
+    downloader.projectRunners = [
+        { async close(options) { calls.push(`a-${options.timeoutMs}`); } },
+        { async close(options) { calls.push(`b-${options.timeoutMs}`); } }
+    ];
+
+    await downloader.closeProjectRunners({ timeoutMs: 15000 });
+
+    assert.deepEqual(calls.sort(), ['a-15000', 'b-15000']);
+});
+
 test('stopScheduledJobs ferma tutti i cron registrati', () => {
     const downloader = new CloudWatchLogDownloader({ configPath: MULTI_CONFIG });
     const stopped = [];

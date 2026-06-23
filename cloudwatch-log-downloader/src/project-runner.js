@@ -2,6 +2,9 @@ const moment = require('moment');
 
 const CloudWatchClient = require('./cloudwatch-client');
 const FileManager = require('./file-manager');
+const ExceptionNotificationManager = require(
+    './notifications/exception-notification-manager'
+);
 
 const INITIAL_LOOKBACK_MS = 15 * 60 * 1000;
 
@@ -18,6 +21,7 @@ function buildSyntheticProjectConfig(rootConfig, entry) {
             exceptionPatterns: entry.exceptionPatterns,
             excludeExceptionPatterns: entry.excludeExceptionPatterns
         },
+        channels: entry.channels || [],
         schedule: entry.schedule,
         files: entry.files,
         logging: entry.logging
@@ -36,11 +40,30 @@ class ProjectRunner {
             ?? new CloudWatchClient(this.config, logger, authManager);
         this.fileManager = options.fileManager
             ?? new FileManager(this.config, logger);
+        const enabledChannels = this.config.channels.filter(
+            channel => channel.enabled !== false
+        );
+        this.notificationManager = options.notificationManager
+            ?? (enabledChannels.length > 0
+                ? new ExceptionNotificationManager({
+                    project: this.project,
+                    environment: this.config.environment,
+                    filePrefix: this.config.files.filePrefix,
+                    logDirectory: this.config.files.logDirectory,
+                    monitorPatterns: this.config.cloudwatch.monitorPatterns,
+                    exceptionPatterns: this.config.cloudwatch.exceptionPatterns,
+                    excludeExceptionPatterns: this.config.cloudwatch.excludeExceptionPatterns,
+                    channels: enabledChannels
+                }, logger)
+                : null);
     }
 
     async init(options = {}) {
         if (typeof this.cloudWatchClient.init === 'function') {
             await this.cloudWatchClient.init(options);
+        }
+        if (this.notificationManager) {
+            await this.notificationManager.init();
         }
     }
 
@@ -72,6 +95,14 @@ class ProjectRunner {
 
             if (events.length > 0) {
                 await this.fileManager.writeLogsToFile(events);
+                try {
+                    this.notificationManager?.ingest(events);
+                } catch (error) {
+                    this.logger.error('Errore durante la gestione delle notifiche', {
+                        project: this.project,
+                        message: error.message
+                    });
+                }
                 this.logger.info(`Download complete: ${events.length} events processed`, {
                     project: this.project
                 });
@@ -88,6 +119,12 @@ class ProjectRunner {
                 message: error.message,
                 stack: error.stack
             });
+        }
+    }
+
+    async close(options = {}) {
+        if (this.notificationManager) {
+            await this.notificationManager.close(options);
         }
     }
 

@@ -156,6 +156,121 @@ test('normalizeConfig applica default schedule files e logging mancanti', () => 
     assert.deepEqual(entry.monitorPatterns, []);
     assert.deepEqual(entry.exceptionPatterns, []);
     assert.deepEqual(entry.excludeExceptionPatterns, []);
+    assert.deepEqual(entry.channels, []);
+});
+
+test('normalizeConfig normalizza channel Slack senza materializzare il webhook', () => {
+    const envName = 'TEST_SLACK_WEBHOOK_URL';
+    const normalized = normalizeConfig({
+        aws: BASE_AWS,
+        cloudwatch: [multiProjectEntry('prj01', {
+            channels: [{
+                id: 'operations-slack',
+                type: 'slack',
+                webhookUrlEnv: envName
+            }]
+        })]
+    }, {
+        env: {
+            [envName]: 'https://hooks.slack.com/services/T000/B000/TEST_TOKEN'
+        }
+    });
+
+    assert.deepEqual(normalized.cloudwatch[0].channels, [{
+        id: 'operations-slack',
+        type: 'slack',
+        enabled: true,
+        webhookUrlEnv: envName
+    }]);
+    assert.doesNotMatch(JSON.stringify(normalized), /T000|TEST_TOKEN/);
+});
+
+test('normalizeConfig accetta channel disabilitato senza variabile ambiente', () => {
+    const normalized = normalizeConfig({
+        aws: BASE_AWS,
+        cloudwatch: [multiProjectEntry('prj01', {
+            channels: [{
+                id: 'disabled-slack',
+                type: 'slack',
+                enabled: false,
+                webhookUrlEnv: 'MISSING_DISABLED_WEBHOOK'
+            }]
+        })]
+    }, { env: {} });
+
+    assert.equal(normalized.cloudwatch[0].channels[0].enabled, false);
+});
+
+test('normalizeConfig rifiuta configurazioni channel non valide', () => {
+    const cases = [
+        {
+            channels: 'slack',
+            pattern: /channels deve essere un array/
+        },
+        {
+            channels: [{ id: 'Bad ID', type: 'slack', webhookUrlEnv: 'X' }],
+            pattern: /channel id non valido/
+        },
+        {
+            channels: [
+                { id: 'same', type: 'slack', enabled: false, webhookUrlEnv: 'A' },
+                { id: 'same', type: 'slack', enabled: false, webhookUrlEnv: 'B' }
+            ],
+            pattern: /channel id duplicato/
+        },
+        {
+            channels: [{ id: 'unknown', type: 'email', enabled: false }],
+            pattern: /tipo channel non supportato/
+        },
+        {
+            channels: [{ id: 'slack', type: 'slack', enabled: 'yes', webhookUrlEnv: 'X' }],
+            pattern: /enabled deve essere boolean/
+        },
+        {
+            channels: [{ id: 'slack', type: 'slack', webhookUrlEnv: 'not-valid-env' }],
+            pattern: /webhookUrlEnv non valido/
+        },
+        {
+            channels: [{ id: 'slack', type: 'slack', webhookUrlEnv: 'MISSING_WEBHOOK' }],
+            pattern: /variabile ambiente MISSING_WEBHOOK mancante/
+        }
+    ];
+
+    for (const entry of cases) {
+        assert.throws(
+            () => normalizeConfig({
+                aws: BASE_AWS,
+                cloudwatch: [multiProjectEntry('prj01', {
+                    channels: entry.channels
+                })]
+            }, { env: {} }),
+            entry.pattern
+        );
+    }
+});
+
+test('normalizeConfig rifiuta webhook Slack non HTTPS o con host differente', () => {
+    const envName = 'TEST_INVALID_SLACK_WEBHOOK';
+    for (const value of [
+        'http://hooks.slack.com/services/test',
+        'https://example.com/services/test',
+        'https://hooks.slack.com/not-services/test',
+        'not-a-url'
+    ]) {
+        assert.throws(
+            () => normalizeConfig({
+                aws: BASE_AWS,
+                cloudwatch: [multiProjectEntry('prj01', {
+                    channels: [{
+                        id: 'slack',
+                        type: 'slack',
+                        webhookUrlEnv: envName
+                    }]
+                })]
+            }, { env: { [envName]: value } }),
+            /webhook Slack non valido/
+        );
+    }
 });
 
 test('normalizeConfig normalizza excludeExceptionPatterns per progetto', () => {

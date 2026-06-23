@@ -178,6 +178,12 @@ class CloudWatchLogDownloader {
         );
     }
 
+    async closeProjectRunners(options = {}) {
+        await Promise.allSettled(
+            this.projectRunners.map(runner => runner.close(options))
+        );
+    }
+
     startScheduledJobs() {
         this.scheduledJobs = this.projectRunners.map(runner => {
             const { downloadInterval, cleanupInterval } = runner.config.schedule;
@@ -237,6 +243,7 @@ class CloudWatchLogDownloader {
                 this.logger.info('Shutting down service...');
                 this.stopScheduledJobs();
                 this.stopCredentialRefreshJob();
+                await this.closeProjectRunners({ timeoutMs: 15000 });
 
                 if (this.monitorServer) {
                     await this.monitorServer.stop();

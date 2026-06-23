@@ -3,6 +3,10 @@ const path = require('path');
 const moment = require('moment');
 const { parseLogFileTimestamp: parseLogFileTimestampFromUtils } = require('./monitor/exception-file-utils');
 const { createExceptionMatcher } = require('./exception-pattern-matcher');
+const {
+    normalizeLogEvent,
+    formatNormalizedLogLine
+} = require('./log-event-normalizer');
 
 class FileManager {
     constructor(config, logger) {
@@ -122,22 +126,7 @@ class FileManager {
     }
 
     formatEventMessage(event) {
-        const logStreamName = event.logStreamName || 'unknown';
-        const logGroupName = event.logGroupName || 'unknown';
-        let body = event.message || '';
-        let containerName = null;
-
-        try {
-            const logObject = JSON.parse(event.message);
-            if (logObject.log) {
-                body = logObject.log.trim();
-            }
-            containerName = logObject.kubernetes?.container_name || null;
-        } catch (e) {
-            // non-JSON message: use raw payload
-        }
-
-        return { logStreamName, logGroupName, containerName, body };
+        return normalizeLogEvent(event);
     }
 
     async writeLogsToFile(events) {
@@ -153,17 +142,14 @@ class FileManager {
             const exceptionLines = [];
 
             for (const event of events) {
-                const timestamp = new Date(event.timestamp).toISOString();
-                const { logGroupName, containerName, body } = this.formatEventMessage(event);
+                const normalized = this.formatEventMessage(event);
+                const { body } = normalized;
 
                 if (!this.shouldIncludeLine(body)) {
                     continue;
                 }
 
-                const source = containerName
-                    ? `${logGroupName} | ${containerName}`
-                    : logGroupName;
-                const line = `[${timestamp}] [${source}] ${body}`;
+                const line = formatNormalizedLogLine(normalized);
                 lines.push(line);
 
                 if (this.matchesExceptionPattern(body)) {

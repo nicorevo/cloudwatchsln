@@ -36,6 +36,14 @@
       "excludeExceptionPatterns": [
         "Known harmless error"
       ],
+      "channels": [
+        {
+          "id": "operations-slack",
+          "type": "slack",
+          "enabled": false,
+          "webhookUrlEnv": "PRJ01_SLACK_WEBHOOK_URL"
+        }
+      ],
       "schedule": {
         "downloadInterval": "*/1 * * * *",
         "cleanupInterval": "*/60 * * * *"

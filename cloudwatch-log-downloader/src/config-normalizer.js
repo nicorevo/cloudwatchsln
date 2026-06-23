@@ -1,4 +1,6 @@
 const PROJECT_ID_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
+const CHANNEL_ID_PATTERN = PROJECT_ID_PATTERN;
+const ENV_NAME_PATTERN = /^[A-Z_][A-Z0-9_]*$/;
 
 const DEFAULT_SCHEDULE = {
     downloadInterval: '*/1 * * * *',
@@ -84,6 +86,82 @@ function normalizeCloudwatchFields(source = {}) {
     };
 }
 
+function validateSlackWebhook(channel, project, env) {
+    if (!ENV_NAME_PATTERN.test(channel.webhookUrlEnv || '')) {
+        throw new Error(
+            `webhookUrlEnv non valido per channel ${channel.id} del progetto ${project}`
+        );
+    }
+
+    if (channel.enabled === false) {
+        return;
+    }
+
+    const webhookUrl = env[channel.webhookUrlEnv];
+    if (!webhookUrl) {
+        throw new Error(
+            `variabile ambiente ${channel.webhookUrlEnv} mancante per channel ${channel.id}`
+        );
+    }
+
+    try {
+        const parsed = new URL(webhookUrl);
+        if (
+            parsed.protocol !== 'https:'
+            || parsed.hostname !== 'hooks.slack.com'
+            || !parsed.pathname.startsWith('/services/')
+        ) {
+            throw new Error('invalid Slack webhook');
+        }
+    } catch (error) {
+        throw new Error(
+            `webhook Slack non valido per channel ${channel.id} del progetto ${project}`
+        );
+    }
+}
+
+function normalizeChannels(channels, project, env = process.env) {
+    if (channels === undefined) {
+        return [];
+    }
+
+    if (!Array.isArray(channels)) {
+        throw new Error(`channels deve essere un array per progetto ${project}`);
+    }
+
+    const seenIds = new Set();
+    return channels.map(channel => {
+        const id = channel?.id;
+        if (!CHANNEL_ID_PATTERN.test(id || '')) {
+            throw new Error(`channel id non valido per progetto ${project}: ${id || 'mancante'}`);
+        }
+        if (seenIds.has(id)) {
+            throw new Error(`channel id duplicato per progetto ${project}: ${id}`);
+        }
+        seenIds.add(id);
+
+        if (channel.type !== 'slack') {
+            throw new Error(
+                `tipo channel non supportato per ${id} del progetto ${project}: ${channel.type}`
+            );
+        }
+        if (channel.enabled !== undefined && typeof channel.enabled !== 'boolean') {
+            throw new Error(
+                `enabled deve essere boolean per channel ${id} del progetto ${project}`
+            );
+        }
+
+        const normalized = {
+            id,
+            type: channel.type,
+            enabled: channel.enabled !== false,
+            webhookUrlEnv: channel.webhookUrlEnv
+        };
+        validateSlackWebhook(normalized, project, env);
+        return normalized;
+    });
+}
+
 function migrateLegacyConfig(config) {
     if (!config.project) {
         throw new Error('Config legacy: campo project mancante a livello root');
@@ -92,6 +170,7 @@ function migrateLegacyConfig(config) {
     return [{
         project: config.project,
         ...normalizeCloudwatchFields(config.cloudwatch),
+        channels: config.cloudwatch.channels,
         schedule: config.schedule,
         files: config.files,
         logging: config.logging
@@ -108,7 +187,7 @@ function validateProjectId(project) {
     }
 }
 
-function normalizeCloudwatchEntry(rawEntry) {
+function normalizeCloudwatchEntry(rawEntry, options = {}) {
     validateProjectId(rawEntry.project);
 
     const files = normalizeFiles(rawEntry.files);
@@ -124,13 +203,18 @@ function normalizeCloudwatchEntry(rawEntry) {
     return {
         project: rawEntry.project,
         ...cloudwatchFields,
+        channels: normalizeChannels(
+            rawEntry.channels,
+            rawEntry.project,
+            options.env ?? process.env
+        ),
         schedule: normalizeSchedule(rawEntry.schedule),
         files,
         logging: normalizeLogging(rawEntry.logging)
     };
 }
 
-function normalizeCloudwatchEntries(config) {
+function normalizeCloudwatchEntries(config, options = {}) {
     let rawEntries;
 
     if (isLegacyCloudwatchConfig(config)) {
@@ -148,7 +232,7 @@ function normalizeCloudwatchEntries(config) {
     const seenProjects = new Set();
     const seenFilePrefixes = new Set();
     const normalizedEntries = rawEntries.map(entry => {
-        const normalized = normalizeCloudwatchEntry(entry);
+        const normalized = normalizeCloudwatchEntry(entry, options);
 
         if (seenProjects.has(normalized.project)) {
             throw new Error(`project duplicato: ${normalized.project}`);
@@ -166,24 +250,27 @@ function normalizeCloudwatchEntries(config) {
     return normalizedEntries;
 }
 
-function normalizeConfig(rawConfig) {
+function normalizeConfig(rawConfig, options = {}) {
     const config = rawConfig || {};
 
     return {
         environment: config.environment,
         aws: config.aws,
         monitor: config.monitor,
-        cloudwatch: normalizeCloudwatchEntries(config)
+        cloudwatch: normalizeCloudwatchEntries(config, options)
     };
 }
 
 module.exports = {
     PROJECT_ID_PATTERN,
+    CHANNEL_ID_PATTERN,
+    ENV_NAME_PATTERN,
     DEFAULT_SCHEDULE,
     DEFAULT_FILES,
     DEFAULT_LOGGING,
     DEFAULT_CLOUDWATCH_FIELDS,
     normalizeConfig,
     normalizeCloudwatchEntries,
+    normalizeChannels,
     isLegacyCloudwatchConfig
 };
