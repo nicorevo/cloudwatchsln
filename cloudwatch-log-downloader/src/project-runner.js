@@ -47,7 +47,8 @@ class ProjectRunner {
         return {
             project: this.project,
             filePrefix: this.config.files.filePrefix,
-            logDirectory: this.config.files.logDirectory
+            logDirectory: this.config.files.logDirectory,
+            exceptionPatterns: [...(this.config.cloudwatch.exceptionPatterns || [])]
         };
     }
 

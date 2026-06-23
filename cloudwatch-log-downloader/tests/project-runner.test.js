@@ -221,6 +221,7 @@ test('ProjectRunner getMonitorDescriptor espone metadati monitor', () => {
     assert.deepEqual(runner.getMonitorDescriptor(), {
         project: 'prj01',
         filePrefix: 'prj01-logs-prod',
-        logDirectory: './logs'
+        logDirectory: './logs',
+        exceptionPatterns: [' ERROR ']
     });
 });

@@ -6,6 +6,11 @@ const { URL } = require('url');
 const ExceptionIndex = require('./exception-index');
 const ExceptionContext = require('./exception-context');
 const ProjectMetrics = require('./project-metrics');
+const {
+    ProjectLogTail,
+    TailError,
+    normalizeTailLimit
+} = require('./project-log-tail');
 
 const LEGACY_GONE_HINT = 'Usa GET /api/v1/projects/{project}/exceptions/tree';
 const DASHBOARD_TIMEZONE = 'Europe/Rome';
@@ -39,6 +44,11 @@ class MonitorServer {
                     projectConfig.filePrefix,
                     projectConfig.logDirectory
                 ),
+                projectLogTail: new ProjectLogTail({
+                    filePrefix: projectConfig.filePrefix,
+                    logDirectory: projectConfig.logDirectory,
+                    exceptionPatterns: projectConfig.exceptionPatterns || []
+                }),
                 exceptionContext: new ExceptionContext(
                     this.config,
                     projectConfig.filePrefix,
@@ -118,6 +128,15 @@ class MonitorServer {
         const projectHealthMatch = pathname.match(/^\/api\/v1\/projects\/([^/]+)\/health$/);
         if (projectHealthMatch) {
             return this.handleProjectHealth(res, decodeURIComponent(projectHealthMatch[1]));
+        }
+
+        const projectTailMatch = pathname.match(/^\/api\/v1\/projects\/([^/]+)\/tail$/);
+        if (projectTailMatch) {
+            return this.handleTail(
+                res,
+                decodeURIComponent(projectTailMatch[1]),
+                requestUrl
+            );
         }
 
         const projectTreeMatch = pathname.match(/^\/api\/v1\/projects\/([^/]+)\/exceptions\/tree$/);
@@ -306,6 +325,44 @@ class MonitorServer {
             exceptionFileCount,
             treeRefreshSeconds: this.config.treeRefreshSeconds
         });
+    }
+
+    async handleTail(res, projectId, requestUrl) {
+        const project = this.resolveProject(projectId);
+        if (!project) {
+            return this.sendProjectNotFound(res, projectId);
+        }
+
+        try {
+            const limit = normalizeTailLimit(requestUrl.searchParams.get('limit'));
+            const tail = await project.projectLogTail.read({
+                limit,
+                after: requestUrl.searchParams.get('after')
+            });
+
+            return this.sendJson(res, 200, {
+                generatedAt: new Date().toISOString(),
+                project: project.project,
+                ...tail
+            });
+        } catch (error) {
+            if (error instanceof TailError) {
+                return this.sendJson(res, 400, {
+                    error: error.message,
+                    code: error.code
+                });
+            }
+
+            this.logger.error('Errore lettura tail progetto:', {
+                project: project.project,
+                message: error.message
+            });
+
+            return this.sendJson(res, 500, {
+                error: 'Errore lettura tail',
+                code: 'TAIL_READ_ERROR'
+            });
+        }
     }
 
     async handleTree(res, projectId, requestUrl) {

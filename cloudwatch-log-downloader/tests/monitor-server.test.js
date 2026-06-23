@@ -73,6 +73,105 @@ test('monitor server espone lista progetti', async () => {
         assert.equal(projects.projects.length, 1);
         assert.equal(projects.projects[0].id, 'my-app');
         assert.equal(projects.projects[0].filePrefix, FILE_PREFIX);
+        assert.equal(projects.projects[0].exceptionPatterns, undefined);
+    } finally {
+        await server.stop();
+    }
+});
+
+test('monitor server espone initial e incremental tail per progetto', async () => {
+    const logDirectory = await fs.mkdtemp(path.join(os.tmpdir(), 'monitor-tail-'));
+    const filename = 'tail-service_2026-06-23_10-00.log';
+    await fs.writeFile(
+        path.join(logDirectory, filename),
+        '[2026-06-23T08:00:00.000Z] [group | api] initial\n'
+    );
+
+    const server = new MonitorServer(MONITOR_CONFIG, logger, [{
+        project: 'tail-service',
+        filePrefix: 'tail-service',
+        logDirectory,
+        logDirectoryDisplay: './logs',
+        exceptionPatterns: ['ERROR']
+    }]);
+    await server.start();
+    const baseUrl = `http://127.0.0.1:${server.server.address().port}`;
+
+    try {
+        const initial = await requestJson(
+            `${baseUrl}/api/v1/projects/tail-service/tail?limit=20`
+        );
+        assert.equal(initial.project, 'tail-service');
+        assert.equal(initial.lines.length, 1);
+        assert.equal(initial.lines[0].message, 'initial');
+
+        await fs.appendFile(
+            path.join(logDirectory, filename),
+            '[2026-06-23T08:00:01.000Z] [group | api] ERROR appended\n'
+        );
+
+        const incremental = await requestJson(
+            `${baseUrl}/api/v1/projects/tail-service/tail?limit=20&after=${encodeURIComponent(initial.cursor)}`
+        );
+        assert.equal(incremental.lines.length, 1);
+        assert.equal(incremental.lines[0].message, 'ERROR appended');
+        assert.equal(incremental.lines[0].isException, true);
+    } finally {
+        await server.stop();
+        await fs.remove(logDirectory);
+    }
+});
+
+test('monitor server valida limit e cursore tail', async () => {
+    const server = await startServerOnRandomPort();
+
+    try {
+        const invalidLimit = await request(
+            `${server.baseUrl}/api/v1/projects/my-app/tail?limit=10`
+        );
+        assert.equal(invalidLimit.statusCode, 400);
+        assert.equal(invalidLimit.body.code, 'INVALID_LIMIT');
+
+        const invalidCursor = await request(
+            `${server.baseUrl}/api/v1/projects/my-app/tail?after=invalid`
+        );
+        assert.equal(invalidCursor.statusCode, 400);
+        assert.equal(invalidCursor.body.code, 'INVALID_CURSOR');
+    } finally {
+        await server.stop();
+    }
+});
+
+test('monitor server isola tail tra progetti nella stessa directory', async () => {
+    const server = new MonitorServer(MONITOR_CONFIG, logger, singleProject([
+        {
+            project: 'my-app',
+            filePrefix: FILE_PREFIX,
+            logDirectory: FIXTURE_DIR,
+            logDirectoryDisplay: './logs',
+            exceptionPatterns: ['ERROR']
+        },
+        {
+            project: 'other-service',
+            filePrefix: OTHER_PREFIX,
+            logDirectory: FIXTURE_DIR,
+            logDirectoryDisplay: './logs',
+            exceptionPatterns: ['Exception']
+        }
+    ]));
+    await server.start();
+    const baseUrl = `http://127.0.0.1:${server.server.address().port}`;
+
+    try {
+        const first = await requestJson(
+            `${baseUrl}/api/v1/projects/my-app/tail?limit=20`
+        );
+        assert.ok(first.lines.every(line => !line.raw.includes('other-service')));
+
+        const second = await requestJson(
+            `${baseUrl}/api/v1/projects/other-service/tail?limit=20`
+        );
+        assert.ok(second.lines.every(line => !line.raw.includes(FILE_PREFIX)));
     } finally {
         await server.stop();
     }

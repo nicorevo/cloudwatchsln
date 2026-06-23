@@ -48,7 +48,8 @@ test('getMonitorProjectDescriptors restituisce un descriptor per runner', () => 
                 return {
                     project: 'prj01',
                     filePrefix: 'prj01-logs-prod',
-                    logDirectory: './logs'
+                    logDirectory: './logs',
+                    exceptionPatterns: [' ERROR ']
                 };
             },
             config: {
@@ -60,7 +61,8 @@ test('getMonitorProjectDescriptors restituisce un descriptor per runner', () => 
                 return {
                     project: 'other-service',
                     filePrefix: 'other-service-logs-prod',
-                    logDirectory: './logs'
+                    logDirectory: './logs',
+                    exceptionPatterns: ['Exception']
                 };
             },
             config: {
@@ -74,6 +76,7 @@ test('getMonitorProjectDescriptors restituisce un descriptor per runner', () => 
     assert.equal(descriptors.length, 2);
     assert.equal(descriptors[0].project, 'prj01');
     assert.equal(descriptors[1].filePrefix, 'other-service-logs-prod');
+    assert.deepEqual(descriptors[0].exceptionPatterns, [' ERROR ']);
     assert.ok(descriptors[0].logDirectoryResolved.includes('logs'));
 });
 
