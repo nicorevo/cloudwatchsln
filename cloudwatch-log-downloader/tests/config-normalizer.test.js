@@ -30,7 +30,8 @@ function legacyConfig(overrides = {}) {
             filterPattern: '',
             maxResults: 100000,
             monitorPatterns: [],
-            exceptionPatterns: [' ERROR ']
+            exceptionPatterns: [' ERROR '],
+            excludeExceptionPatterns: ['Known harmless error']
         },
         schedule: {
             downloadInterval: '*/1 * * * *',
@@ -93,6 +94,7 @@ test('normalizeConfig migra config legacy monoprogetto in cloudwatch[]', () => {
     assert.equal(entry.project, 'prj01');
     assert.deepEqual(entry.logGroups, ['/eks/ns/worker-prod']);
     assert.deepEqual(entry.exceptionPatterns, [' ERROR ']);
+    assert.deepEqual(entry.excludeExceptionPatterns, ['Known harmless error']);
     assert.equal(entry.files.filePrefix, 'prj01-logs-prod');
     assert.equal(entry.schedule.downloadInterval, '*/1 * * * *');
     assert.equal(entry.logging.level, 'info');
@@ -153,6 +155,39 @@ test('normalizeConfig applica default schedule files e logging mancanti', () => 
     assert.equal(entry.maxResults, 100000);
     assert.deepEqual(entry.monitorPatterns, []);
     assert.deepEqual(entry.exceptionPatterns, []);
+    assert.deepEqual(entry.excludeExceptionPatterns, []);
+});
+
+test('normalizeConfig normalizza excludeExceptionPatterns per progetto', () => {
+    const normalized = normalizeConfig({
+        aws: BASE_AWS,
+        cloudwatch: [
+            multiProjectEntry('prj01', {
+                excludeExceptionPatterns: ['ignored-a']
+            }),
+            multiProjectEntry('other-service', {
+                excludeExceptionPatterns: ['ignored-b']
+            })
+        ]
+    });
+
+    assert.deepEqual(normalized.cloudwatch[0].excludeExceptionPatterns, ['ignored-a']);
+    assert.deepEqual(normalized.cloudwatch[1].excludeExceptionPatterns, ['ignored-b']);
+    assert.notEqual(
+        normalized.cloudwatch[0].excludeExceptionPatterns,
+        normalized.cloudwatch[1].excludeExceptionPatterns
+    );
+});
+
+test('normalizeConfig usa array vuoto per excludeExceptionPatterns non array', () => {
+    const normalized = normalizeConfig({
+        aws: BASE_AWS,
+        cloudwatch: [multiProjectEntry('prj01', {
+            excludeExceptionPatterns: 'ignored'
+        })]
+    });
+
+    assert.deepEqual(normalized.cloudwatch[0].excludeExceptionPatterns, []);
 });
 
 test('normalizeConfig rifiuta cloudwatch[] vuoto', () => {

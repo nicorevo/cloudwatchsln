@@ -74,6 +74,7 @@ test('monitor server espone lista progetti', async () => {
         assert.equal(projects.projects[0].id, 'my-app');
         assert.equal(projects.projects[0].filePrefix, FILE_PREFIX);
         assert.equal(projects.projects[0].exceptionPatterns, undefined);
+        assert.equal(projects.projects[0].excludeExceptionPatterns, undefined);
     } finally {
         await server.stop();
     }
@@ -139,6 +140,78 @@ test('monitor server valida limit e cursore tail', async () => {
         assert.equal(invalidCursor.body.code, 'INVALID_CURSOR');
     } finally {
         await server.stop();
+    }
+});
+
+test('monitor server applica exclude per progetto a dashboard, health, tree, detail e tail', async () => {
+    const logDirectory = await fs.mkdtemp(path.join(os.tmpdir(), 'monitor-exclude-'));
+    const prefix = 'filtered-service';
+    const fileId = '2026-06-23_10-00';
+
+    await fs.writeFile(
+        path.join(logDirectory, `${prefix}-exceptions_${fileId}.log`),
+        [
+            '[2026-06-23T08:00:00.000Z] [group | api] ERROR first',
+            '[2026-06-23T08:01:00.000Z] [group | api] ERROR Known harmless error',
+            '[2026-06-23T08:02:00.000Z] [group | api] ERROR third'
+        ].join('\n')
+    );
+    await fs.writeFile(
+        path.join(logDirectory, `${prefix}_${fileId}.log`),
+        [
+            '[2026-06-23T08:00:00.000Z] [group | api] ERROR first',
+            '[2026-06-23T08:01:00.000Z] [group | api] ERROR Known harmless error',
+            '[2026-06-23T08:02:00.000Z] [group | api] ERROR third'
+        ].join('\n') + '\n'
+    );
+
+    const server = new MonitorServer(MONITOR_CONFIG, logger, [{
+        project: 'filtered-service',
+        filePrefix: prefix,
+        logDirectory,
+        logDirectoryDisplay: './logs',
+        exceptionPatterns: ['ERROR'],
+        excludeExceptionPatterns: ['Known harmless error']
+    }], {
+        nowProvider: () => new Date('2026-06-23T08:30:00.000Z')
+    });
+    await server.start();
+    const baseUrl = `http://127.0.0.1:${server.server.address().port}`;
+
+    try {
+        const dashboard = await requestJson(`${baseUrl}/api/v1/dashboard`);
+        assert.equal(dashboard.projects[0].metrics.retainedExceptionCount, 2);
+        assert.equal(dashboard.projects[0].metrics.exceptionFileCount, 1);
+
+        const health = await requestJson(
+            `${baseUrl}/api/v1/projects/filtered-service/health`
+        );
+        assert.equal(health.exceptionFileCount, 1);
+
+        const tree = await requestJson(
+            `${baseUrl}/api/v1/projects/filtered-service/exceptions/tree`
+        );
+        assert.deepEqual(
+            tree.files[0].exceptions.map(exception => exception.id),
+            [`${fileId}:1`, `${fileId}:3`]
+        );
+
+        const excludedDetail = await request(
+            `${baseUrl}/api/v1/projects/filtered-service/exceptions/${fileId}:2`
+        );
+        assert.equal(excludedDetail.statusCode, 404);
+        assert.equal(excludedDetail.body.code, 'NOT_FOUND');
+
+        const tail = await requestJson(
+            `${baseUrl}/api/v1/projects/filtered-service/tail?limit=20`
+        );
+        assert.deepEqual(
+            tail.lines.map(line => line.isException),
+            [true, false, true]
+        );
+    } finally {
+        await server.stop();
+        await fs.remove(logDirectory);
     }
 });
 

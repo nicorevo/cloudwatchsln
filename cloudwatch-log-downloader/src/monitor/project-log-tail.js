@@ -6,6 +6,7 @@ const {
     parseMainFilename,
     resolveSafeLogPath
 } = require('./exception-file-utils');
+const { createExceptionMatcher } = require('../exception-pattern-matcher');
 
 const DEFAULT_LIMIT = 200;
 const MIN_LIMIT = 20;
@@ -85,8 +86,10 @@ class ProjectLogTail {
     constructor(options) {
         this.filePrefix = options.filePrefix;
         this.logDirectory = options.logDirectory;
-        this.exceptionPatterns = (options.exceptionPatterns || [])
-            .filter(pattern => typeof pattern === 'string' && pattern.length > 0);
+        this.isExceptionMessage = createExceptionMatcher(
+            options.exceptionPatterns,
+            options.excludeExceptionPatterns
+        );
     }
 
     async read(options = {}) {
@@ -248,9 +251,7 @@ class ProjectLogTail {
             source: parsed.source,
             message: parsed.body,
             raw,
-            isException: this.exceptionPatterns.some(pattern =>
-                parsed.body.includes(pattern)
-            )
+            isException: this.isExceptionMessage(parsed.body)
         };
     }
 }

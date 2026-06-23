@@ -136,3 +136,28 @@ test('timestamp assenti o invalidi contribuiscono solo al totale', async () => {
         assert.equal(result.latestExceptionAt, null);
     });
 });
+
+test('ignora righe escluse in tutti i conteggi e nei file visibili', async () => {
+    await withLogDirectory({
+        [`${FILE_PREFIX}-exceptions_filtered.log`]: [
+            exceptionLine('2026-06-22T11:30:00.000Z', 'ERROR real failure'),
+            exceptionLine('2026-06-22T11:45:00.000Z', 'ERROR Known harmless error')
+        ].join('\n'),
+        [`${FILE_PREFIX}-exceptions_only-excluded.log`]:
+            exceptionLine('2026-06-22T11:50:00.000Z', 'ERROR Known harmless error')
+    }, async logDirectory => {
+        const metrics = new ProjectMetrics(FILE_PREFIX, logDirectory, {
+            exceptionPatterns: ['ERROR'],
+            excludeExceptionPatterns: ['Known harmless error']
+        });
+        const result = await metrics.calculate({ now: NOW });
+
+        assert.deepEqual(result, {
+            retainedExceptionCount: 1,
+            lastHourExceptionCount: 1,
+            todayExceptionCount: 1,
+            exceptionFileCount: 1,
+            latestExceptionAt: '2026-06-22T11:30:00.000Z'
+        });
+    });
+});

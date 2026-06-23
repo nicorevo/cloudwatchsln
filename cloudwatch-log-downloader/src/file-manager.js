@@ -2,6 +2,7 @@ const fs = require('fs-extra');
 const path = require('path');
 const moment = require('moment');
 const { parseLogFileTimestamp: parseLogFileTimestampFromUtils } = require('./monitor/exception-file-utils');
+const { createExceptionMatcher } = require('./exception-pattern-matcher');
 
 class FileManager {
     constructor(config, logger) {
@@ -11,6 +12,10 @@ class FileManager {
         this.filePrefix = config.files.filePrefix;
         this.retentionMinutes = config.files.retentionMinutes;
         this.preserveExceptionPairs = config.files.preserveExceptionPairs !== false;
+        this.isExceptionMessage = createExceptionMatcher(
+            config.cloudwatch?.exceptionPatterns,
+            config.cloudwatch?.excludeExceptionPatterns
+        );
 
         this.ensureLogDirectory();
     }
@@ -74,12 +79,7 @@ class FileManager {
     }
 
     matchesExceptionPattern(message) {
-        const patterns = this.config.cloudwatch?.exceptionPatterns;
-        if (!patterns || patterns.length === 0) {
-            return false;
-        }
-        const text = message || '';
-        return patterns.some(pattern => text.includes(pattern));
+        return this.isExceptionMessage(message);
     }
 
     getExceptionLogFilePath() {

@@ -15,7 +15,8 @@ function buildSyntheticProjectConfig(rootConfig, entry) {
             filterPattern: entry.filterPattern,
             maxResults: entry.maxResults,
             monitorPatterns: entry.monitorPatterns,
-            exceptionPatterns: entry.exceptionPatterns
+            exceptionPatterns: entry.exceptionPatterns,
+            excludeExceptionPatterns: entry.excludeExceptionPatterns
         },
         schedule: entry.schedule,
         files: entry.files,
@@ -48,7 +49,10 @@ class ProjectRunner {
             project: this.project,
             filePrefix: this.config.files.filePrefix,
             logDirectory: this.config.files.logDirectory,
-            exceptionPatterns: [...(this.config.cloudwatch.exceptionPatterns || [])]
+            exceptionPatterns: [...(this.config.cloudwatch.exceptionPatterns || [])],
+            excludeExceptionPatterns: [
+                ...(this.config.cloudwatch.excludeExceptionPatterns || [])
+            ]
         };
     }
 

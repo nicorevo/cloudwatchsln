@@ -20,7 +20,8 @@ const DEFAULT_CLOUDWATCH_FIELDS = {
     filterPattern: '',
     maxResults: 100000,
     monitorPatterns: [],
-    exceptionPatterns: []
+    exceptionPatterns: [],
+    excludeExceptionPatterns: []
 };
 
 function isLegacyCloudwatchConfig(config) {
@@ -75,8 +76,11 @@ function normalizeCloudwatchFields(source = {}) {
             ? source.monitorPatterns
             : DEFAULT_CLOUDWATCH_FIELDS.monitorPatterns,
         exceptionPatterns: Array.isArray(source.exceptionPatterns)
-            ? source.exceptionPatterns
-            : DEFAULT_CLOUDWATCH_FIELDS.exceptionPatterns
+            ? [...source.exceptionPatterns]
+            : [],
+        excludeExceptionPatterns: Array.isArray(source.excludeExceptionPatterns)
+            ? [...source.excludeExceptionPatterns]
+            : []
     };
 }
 

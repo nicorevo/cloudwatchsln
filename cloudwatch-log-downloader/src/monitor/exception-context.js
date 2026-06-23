@@ -9,13 +9,19 @@ const {
     resolveSafeLogPath
 } = require('./exception-file-utils');
 const LogFileCache = require('./log-file-cache');
+const { createExceptionMatcher } = require('../exception-pattern-matcher');
 
 class ExceptionContext {
-    constructor(config, filePrefix, logDirectory) {
+    constructor(config, filePrefix, logDirectory, options = {}) {
         this.config = config;
         this.filePrefix = filePrefix;
         this.logDirectory = logDirectory;
         this.fileCache = new LogFileCache();
+        this.isVisibleException = createExceptionMatcher(
+            options.exceptionPatterns,
+            options.excludeExceptionPatterns,
+            { matchWhenUnconfigured: true }
+        );
     }
 
     getExceptionFilename(fileId) {
@@ -51,6 +57,12 @@ class ExceptionContext {
 
         const exceptionLine = exceptionLines[lineIndex];
         const parsedLine = parseLogLine(exceptionLine);
+        if (!this.isVisibleException(parsedLine.body)) {
+            const error = new Error('Exception not found in file');
+            error.code = 'NOT_FOUND';
+            throw error;
+        }
+
         const mainFilename = getPairedMainFilename(exceptionFilename, this.filePrefix);
         const mainPath = mainFilename
             ? resolveSafeLogPath(this.logDirectory, mainFilename)

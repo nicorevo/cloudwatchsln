@@ -21,6 +21,7 @@ const PROJECT_ENTRY = {
     maxResults: 50000,
     monitorPatterns: [],
     exceptionPatterns: [' ERROR '],
+    excludeExceptionPatterns: ['Known harmless error'],
     schedule: {
         downloadInterval: '*/1 * * * *',
         cleanupInterval: '*/60 * * * *'
@@ -61,6 +62,10 @@ test('buildSyntheticProjectConfig shaped come config monoprogetto', () => {
     assert.deepEqual(config.cloudwatch.logGroups, ['/eks/ns/worker-prod']);
     assert.equal(config.cloudwatch.filterPattern, 'ERROR');
     assert.equal(config.cloudwatch.maxResults, 50000);
+    assert.deepEqual(
+        config.cloudwatch.excludeExceptionPatterns,
+        ['Known harmless error']
+    );
     assert.deepEqual(config.schedule, PROJECT_ENTRY.schedule);
     assert.deepEqual(config.files, PROJECT_ENTRY.files);
     assert.deepEqual(config.logging, PROJECT_ENTRY.logging);
@@ -222,6 +227,7 @@ test('ProjectRunner getMonitorDescriptor espone metadati monitor', () => {
         project: 'prj01',
         filePrefix: 'prj01-logs-prod',
         logDirectory: './logs',
-        exceptionPatterns: [' ERROR ']
+        exceptionPatterns: [' ERROR '],
+        excludeExceptionPatterns: ['Known harmless error']
     });
 });

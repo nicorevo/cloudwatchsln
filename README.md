@@ -79,6 +79,9 @@ Essential fields:
         "Exception",
         "Traceback (most recent call last)"
       ],
+      "excludeExceptionPatterns": [
+        "Known harmless error"
+      ],
       "schedule": {
         "downloadInterval": "*/1 * * * *",
         "cleanupInterval": "*/60 * * * *"
@@ -105,6 +108,7 @@ Add more entries to `cloudwatch[]` to monitor additional services in the same pr
 | `cloudwatch[].project` | Slug for API paths and UI selector (`^[a-z0-9][a-z0-9-]*$`) |
 | `cloudwatch[].logGroups[]` | CloudWatch paths to query (preferred on EKS) |
 | `cloudwatch[].exceptionPatterns[]` | Substrings copied into `-exceptions_*` files |
+| `cloudwatch[].excludeExceptionPatterns[]` | Optional substrings that suppress matching exceptions |
 | `cloudwatch[].files.filePrefix` | Filename prefix under `./logs/` (must be unique per entry) |
 | `monitor.enabled` | Exception UI at `http://127.0.0.1:3847` |
 
@@ -117,6 +121,7 @@ Other useful fields in `config.sample.json`:
 | `aws` | `credentialRefreshIntervalMinutes` | `55` | Proactive STS credential refresh |
 | `aws` | `loginOnStartupIfNeeded` | `false` | Opens SSO browser if session is missing |
 | `cloudwatch[]` | `monitorPatterns` | `[]` | Empty = all lines in the main file |
+| `cloudwatch[]` | `excludeExceptionPatterns` | `[]` | Excludes false positives matched by `exceptionPatterns` |
 | `cloudwatch[]` | `schedule.downloadInterval` | `*/1 * * * *` | Download cron per project (Europe/Rome) |
 | `cloudwatch[]` | `files.preserveExceptionPairs` | `true` | Do not delete exception/main pairs |
 | `cloudwatch[]` | `logging.level` | `info` | Service log level uses the **first** entry's `logging.level` |
@@ -172,14 +177,26 @@ The most important step for a new project is populating `cloudwatch[].exceptionP
 Generic starter patterns:
 
 ```json
-"exceptionPatterns": [
-  " ERROR ",
-  " FATAL ",
-  "Exception",
-  "Traceback (most recent call last)",
-  "Caused by:"
-]
+{
+  "exceptionPatterns": [
+    " ERROR ",
+    " FATAL ",
+    "Exception",
+    "Traceback (most recent call last)",
+    "Caused by:"
+  ],
+  "excludeExceptionPatterns": [
+    "Known harmless error"
+  ]
+}
 ```
+
+Both arrays use case-sensitive substring matching. A line is an exception only
+when it matches `exceptionPatterns` and does not match
+`excludeExceptionPatterns`. The exclusion is optional (`[]` by default): it
+removes false positives from exception files, counters, APIs, and highlighting,
+but the line remains in the main log and in the live tail. Restart the process
+after changing either list.
 
 ---
 

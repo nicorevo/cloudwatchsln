@@ -225,6 +225,38 @@ test('riga non strutturata resta leggibile e pattern vuoti sono ignorati', async
     });
 });
 
+test('riga esclusa resta nel tail ma non è classificata come eccezione', async () => {
+    await withLogDirectory({
+        [`${FILE_PREFIX}_2026-06-23_10-00.log`]: [
+            logLine(
+                '2026-06-23T08:00:00.000Z',
+                'group | api',
+                'ERROR Known harmless error'
+            ),
+            logLine(
+                '2026-06-23T08:00:01.000Z',
+                'group | api',
+                'ERROR real failure'
+            )
+        ].join('\n') + '\n'
+    }, async logDirectory => {
+        const reader = new ProjectLogTail({
+            filePrefix: FILE_PREFIX,
+            logDirectory,
+            exceptionPatterns: ['ERROR'],
+            excludeExceptionPatterns: ['Known harmless error']
+        });
+
+        const result = await reader.read({ limit: 20 });
+
+        assert.deepEqual(
+            result.lines.map(line => line.isException),
+            [false, true]
+        );
+        assert.equal(result.lines.length, 2);
+    });
+});
+
 test('rifiuta cursori malformati o riferiti a file fuori scope', async () => {
     await withLogDirectory({}, async logDirectory => {
         const reader = new ProjectLogTail({

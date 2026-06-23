@@ -33,6 +33,9 @@
         "Main Error",
         "Traceback (most recent call last)"
       ],
+      "excludeExceptionPatterns": [
+        "Known harmless error"
+      ],
       "schedule": {
         "downloadInterval": "*/1 * * * *",
         "cleanupInterval": "*/60 * * * *"
@@ -64,6 +67,7 @@
         "Main Error",
         "Traceback (most recent call last)"
       ],
+      "excludeExceptionPatterns": [],
       "schedule": {
         "downloadInterval": "*/1 * * * *",
         "cleanupInterval": "*/60 * * * *"

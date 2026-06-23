@@ -29,6 +29,11 @@ class MonitorServer {
         const registry = new Map();
 
         for (const projectConfig of projects || []) {
+            const patternOptions = {
+                exceptionPatterns: projectConfig.exceptionPatterns,
+                excludeExceptionPatterns: projectConfig.excludeExceptionPatterns
+            };
+
             registry.set(projectConfig.project, {
                 project: projectConfig.project,
                 filePrefix: projectConfig.filePrefix,
@@ -38,21 +43,24 @@ class MonitorServer {
                 exceptionIndex: new ExceptionIndex(
                     this.config,
                     projectConfig.filePrefix,
-                    projectConfig.logDirectory
+                    projectConfig.logDirectory,
+                    patternOptions
                 ),
                 projectMetrics: new ProjectMetrics(
                     projectConfig.filePrefix,
-                    projectConfig.logDirectory
+                    projectConfig.logDirectory,
+                    patternOptions
                 ),
                 projectLogTail: new ProjectLogTail({
                     filePrefix: projectConfig.filePrefix,
                     logDirectory: projectConfig.logDirectory,
-                    exceptionPatterns: projectConfig.exceptionPatterns || []
+                    ...patternOptions
                 }),
                 exceptionContext: new ExceptionContext(
                     this.config,
                     projectConfig.filePrefix,
-                    projectConfig.logDirectory
+                    projectConfig.logDirectory,
+                    patternOptions
                 )
             });
         }

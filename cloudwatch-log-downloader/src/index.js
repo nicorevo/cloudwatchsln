@@ -133,7 +133,8 @@ class CloudWatchLogDownloader {
                 filePrefix: descriptor.filePrefix,
                 logDirectory: descriptor.logDirectoryResolved,
                 logDirectoryDisplay: descriptor.logDirectoryDisplay,
-                exceptionPatterns: descriptor.exceptionPatterns
+                exceptionPatterns: descriptor.exceptionPatterns,
+                excludeExceptionPatterns: descriptor.excludeExceptionPatterns
             }))
         );
         await this.monitorServer.start();

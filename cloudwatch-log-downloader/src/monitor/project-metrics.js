@@ -7,6 +7,7 @@ const {
     resolveSafeLogPath
 } = require('./exception-file-utils');
 const LogFileCache = require('./log-file-cache');
+const { createExceptionMatcher } = require('../exception-pattern-matcher');
 
 const DEFAULT_TIMEZONE = 'Europe/Rome';
 const LAST_HOUR_MS = 60 * 60 * 1000;
@@ -37,10 +38,15 @@ function parseValidTimestamp(timestamp) {
 }
 
 class ProjectMetrics {
-    constructor(filePrefix, logDirectory) {
+    constructor(filePrefix, logDirectory, options = {}) {
         this.filePrefix = filePrefix;
         this.logDirectory = logDirectory;
         this.fileCache = new LogFileCache();
+        this.isVisibleException = createExceptionMatcher(
+            options.exceptionPatterns,
+            options.excludeExceptionPatterns,
+            { matchWhenUnconfigured: true }
+        );
     }
 
     async calculate(options = {}) {
@@ -68,7 +74,8 @@ class ProjectMetrics {
             }
 
             const lines = (await this.fileCache.readLines(filePath))
-                .filter(line => line.trim().length > 0);
+                .filter(line => line.trim().length > 0)
+                .filter(line => this.isVisibleException(parseLogLine(line).body));
 
             if (lines.length > 0) {
                 exceptionFileCount += 1;

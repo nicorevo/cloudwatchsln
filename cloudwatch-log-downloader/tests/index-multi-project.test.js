@@ -49,7 +49,8 @@ test('getMonitorProjectDescriptors restituisce un descriptor per runner', () => 
                     project: 'prj01',
                     filePrefix: 'prj01-logs-prod',
                     logDirectory: './logs',
-                    exceptionPatterns: [' ERROR ']
+                    exceptionPatterns: [' ERROR '],
+                    excludeExceptionPatterns: ['Known harmless error']
                 };
             },
             config: {
@@ -62,7 +63,8 @@ test('getMonitorProjectDescriptors restituisce un descriptor per runner', () => 
                     project: 'other-service',
                     filePrefix: 'other-service-logs-prod',
                     logDirectory: './logs',
-                    exceptionPatterns: ['Exception']
+                    exceptionPatterns: ['Exception'],
+                    excludeExceptionPatterns: []
                 };
             },
             config: {
@@ -77,6 +79,10 @@ test('getMonitorProjectDescriptors restituisce un descriptor per runner', () => 
     assert.equal(descriptors[0].project, 'prj01');
     assert.equal(descriptors[1].filePrefix, 'other-service-logs-prod');
     assert.deepEqual(descriptors[0].exceptionPatterns, [' ERROR ']);
+    assert.deepEqual(
+        descriptors[0].excludeExceptionPatterns,
+        ['Known harmless error']
+    );
     assert.ok(descriptors[0].logDirectoryResolved.includes('logs'));
 });
 
