@@ -449,7 +449,10 @@ summary:focus-visible {
 .tail-main {
     display: grid;
     grid-template-rows: auto auto minmax(0, 1fr);
+    width: 100%;
+    min-width: 0;
     height: calc(100vh - 3.5rem);
+    overflow: hidden;
 }
 
 .tail-toolbar {
@@ -517,14 +520,20 @@ summary:focus-visible {
 
 .tail-viewer-shell {
     position: relative;
+    width: 100%;
+    min-width: 0;
     min-height: 0;
+    overflow: hidden;
     background: #070a0e;
 }
 
 .tail-viewer {
+    width: 100%;
+    min-width: 0;
     height: 100%;
     padding: 0.75rem 1rem 4rem;
-    overflow: auto;
+    overflow-x: auto;
+    overflow-y: auto;
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     font-size: 0.8rem;
     line-height: 1.5;

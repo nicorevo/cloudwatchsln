@@ -79,3 +79,13 @@ test('monitor.css definisce viewer tail minimalista e responsive', () => {
     assert.match(css, /\.tail-follow/);
     assert.match(css, /position: sticky/);
 });
+
+test('monitor.css confina lo scroll orizzontale no-wrap al viewer', () => {
+    const css = fs.readFileSync(path.join(PUBLIC_DIR, 'css', 'monitor.css'), 'utf8');
+
+    assert.match(css, /\.tail-main\s*\{[^}]*width:\s*100%;[^}]*min-width:\s*0;/s);
+    assert.match(css, /\.tail-viewer-shell\s*\{[^}]*width:\s*100%;[^}]*min-width:\s*0;/s);
+    assert.match(css, /\.tail-viewer\s*\{[^}]*width:\s*100%;[^}]*overflow-x:\s*auto;/s);
+    assert.match(css, /\.tail-page\s*\{[^}]*overflow:\s*hidden;/s);
+    assert.match(css, /\.tail-viewer\.no-wrap\s+\.tail-message-text\s*\{[^}]*white-space:\s*pre;/s);
+});
