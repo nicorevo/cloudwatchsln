@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tail · CloudWatch Log Downloader</title>
+    <link rel="stylesheet" href="/css/monitor.css">
+</head>
+<body class="tail-page">
+    <header class="tail-header">
+        <h1 class="dashboard-brand">CloudWatch Log Downloader</h1>
+        <a class="header-link" href="/">Dashboard</a>
+    </header>
+
+    <main class="tail-main">
+        <section class="tail-toolbar" aria-label="Controlli tail">
+            <label class="tail-project-field" for="tail-project-select">
+                <span>Servizio</span>
+                <select id="tail-project-select" class="project-select" aria-label="Servizio"></select>
+            </label>
+
+            <div class="tail-actions">
+                <span id="tail-live-status" class="tail-live-status" aria-live="polite">Avvio…</span>
+                <button id="tail-pause" class="tail-control" type="button">Pausa</button>
+                <button id="tail-wrap" class="tail-control" type="button" aria-pressed="true">A capo: sì</button>
+                <button id="tail-clear" class="tail-control" type="button">Pulisci vista</button>
+            </div>
+        </section>
+
+        <div class="tail-meta">
+            <span id="tail-message" aria-live="polite">Caricamento progetti…</span>
+            <span id="tail-line-count">0 righe</span>
+        </div>
+
+        <section class="tail-viewer-shell">
+            <div
+                id="tail-viewer"
+                class="tail-viewer"
+                role="log"
+                aria-label="Log raccolti"
+                aria-live="off"
+                tabindex="0"
+            ></div>
+            <button id="tail-follow" class="tail-follow hidden" type="button">
+                Segui live ↓
+            </button>
+        </section>
+    </main>
+
+    <script src="/js/tail.js"></script>
+</body>
+</html>

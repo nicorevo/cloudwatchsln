@@ -414,6 +414,21 @@ test('monitor server serves frontend index.html', async () => {
     }
 });
 
+test('monitor server serves tail page', async () => {
+    const server = await startServerOnRandomPort();
+
+    try {
+        const response = await request(`${server.baseUrl}/tail`);
+        assert.equal(response.statusCode, 200);
+        assert.match(response.body, /id="tail-viewer"/);
+
+        const explicit = await request(`${server.baseUrl}/tail.html`);
+        assert.equal(explicit.statusCode, 200);
+    } finally {
+        await server.stop();
+    }
+});
+
 test('monitor server returns 400 for path traversal exception id', async () => {
     const server = await startServerOnRandomPort();
     const maliciousId = `${encodeURIComponent('../../../etc/passwd')}:1`;

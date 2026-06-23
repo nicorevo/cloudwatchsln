@@ -61,6 +61,19 @@ summary:focus-visible {
     margin: 0;
 }
 
+.header-link {
+    color: var(--accent);
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-decoration: none;
+    text-transform: uppercase;
+}
+
+.header-link:hover {
+    text-decoration: underline;
+}
+
 .dashboard-view {
     width: min(76rem, 100%);
     margin: 0 auto;
@@ -417,6 +430,169 @@ summary:focus-visible {
     border: 0;
 }
 
+.tail-page {
+    height: 100vh;
+    overflow: hidden;
+}
+
+.tail-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    height: 3.5rem;
+    padding: 0 1.25rem;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+}
+
+.tail-main {
+    display: grid;
+    grid-template-rows: auto auto minmax(0, 1fr);
+    height: calc(100vh - 3.5rem);
+}
+
+.tail-toolbar {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.75rem 1.25rem;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+}
+
+.tail-project-field,
+.tail-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.tail-project-field > span {
+    color: var(--muted);
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.tail-control {
+    padding: 0.45rem 0.7rem;
+    border: 1px solid var(--border-strong);
+    border-radius: 0.35rem;
+    background: var(--bg);
+    color: var(--text);
+    cursor: pointer;
+}
+
+.tail-control:hover {
+    border-color: var(--accent);
+}
+
+.tail-live-status {
+    min-width: 4.75rem;
+    color: var(--muted);
+    font-size: 0.78rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.tail-live-status.is-live {
+    color: #79d7a5;
+}
+
+.tail-meta {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.45rem 1.25rem;
+    border-bottom: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 0.78rem;
+}
+
+.tail-viewer-shell {
+    position: relative;
+    min-height: 0;
+    background: #070a0e;
+}
+
+.tail-viewer {
+    height: 100%;
+    padding: 0.75rem 1rem 4rem;
+    overflow: auto;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.8rem;
+    line-height: 1.5;
+}
+
+.tail-line {
+    display: grid;
+    grid-template-columns: 7.5rem minmax(12rem, 22rem) minmax(0, 1fr);
+    gap: 0.8rem;
+    padding: 0.16rem 0.5rem;
+    border-left: 3px solid transparent;
+}
+
+.tail-line:nth-child(even) {
+    background: rgba(255, 255, 255, 0.018);
+}
+
+.tail-line-exception {
+    border-left-color: var(--error);
+    background: rgba(244, 122, 122, 0.11);
+    color: #ffd4d4;
+}
+
+.tail-line-warning {
+    border-left-color: var(--warn);
+    color: var(--warn);
+}
+
+.tail-time {
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.tail-source {
+    overflow: hidden;
+    color: var(--accent);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.tail-message-text {
+    min-width: 0;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.tail-viewer.no-wrap .tail-line {
+    grid-template-columns: 7.5rem 22rem max-content;
+    min-width: max-content;
+}
+
+.tail-viewer.no-wrap .tail-message-text {
+    white-space: pre;
+}
+
+.tail-follow {
+    position: absolute;
+    right: 1rem;
+    bottom: 1rem;
+    padding: 0.5rem 0.8rem;
+    border: 1px solid var(--accent);
+    border-radius: 999px;
+    background: var(--accent-soft);
+    color: var(--text);
+    cursor: pointer;
+}
+
 @media (max-width: 900px) {
     .dashboard-view {
         padding: 1.5rem 1rem 3rem;
@@ -455,6 +631,20 @@ summary:focus-visible {
     .detail-log {
         max-height: none;
     }
+
+    .tail-toolbar {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .tail-actions {
+        width: 100%;
+        flex-wrap: wrap;
+    }
+
+    .tail-line {
+        grid-template-columns: 6.5rem minmax(8rem, 15rem) minmax(0, 1fr);
+    }
 }
 
 @media (max-width: 520px) {
@@ -470,6 +660,37 @@ summary:focus-visible {
     .project-select {
         width: 100%;
         max-width: none;
+    }
+
+    .tail-header,
+    .tail-toolbar,
+    .tail-meta {
+        padding-right: 0.75rem;
+        padding-left: 0.75rem;
+    }
+
+    .tail-project-field {
+        width: 100%;
+    }
+
+    .tail-project-field .project-select {
+        flex: 1;
+    }
+
+    .tail-line {
+        display: block;
+        padding: 0.4rem 0.5rem;
+    }
+
+    .tail-time,
+    .tail-source {
+        display: inline-block;
+        margin-right: 0.75rem;
+    }
+
+    .tail-message-text {
+        display: block;
+        margin-top: 0.2rem;
     }
 }
 

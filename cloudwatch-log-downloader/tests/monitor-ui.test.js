@@ -30,6 +30,7 @@ test('header dashboard mostra solo brand e aggiornamento sulla stessa riga', () 
     assert.match(html, /id="dashboard-updated-at"/);
     assert.doesNotMatch(html, />Console monitoraggio</);
     assert.doesNotMatch(html, /Stato delle eccezioni rilevate/);
+    assert.match(html, /href="\/tail"/);
 });
 
 test('monitor.js usa API scoped per progetto', () => {

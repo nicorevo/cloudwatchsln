@@ -166,6 +166,10 @@ class MonitorServer {
             return this.serveStaticFile(res, path.join(this.publicDirectory, 'index.html'), 'text/html; charset=utf-8');
         }
 
+        if (pathname === '/tail' || pathname === '/tail.html') {
+            return this.serveStaticFile(res, path.join(this.publicDirectory, 'tail.html'), 'text/html; charset=utf-8');
+        }
+
         if (pathname.startsWith('/css/') || pathname.startsWith('/js/')) {
             const relativePath = pathname.replace(/^\/(css|js)\//, '$1/');
             const absolutePath = path.join(this.publicDirectory, relativePath);
