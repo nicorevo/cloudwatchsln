@@ -531,9 +531,6 @@ summary:focus-visible {
 }
 
 .tail-line {
-    display: grid;
-    grid-template-columns: 7.5rem minmax(12rem, 22rem) minmax(0, 1fr);
-    gap: 0.8rem;
     padding: 0.16rem 0.5rem;
     border-left: 3px solid transparent;
 }
@@ -553,27 +550,12 @@ summary:focus-visible {
     color: var(--warn);
 }
 
-.tail-time {
-    color: var(--muted);
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
-}
-
-.tail-source {
-    overflow: hidden;
-    color: var(--accent);
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
 .tail-message-text {
-    min-width: 0;
     white-space: pre-wrap;
     overflow-wrap: anywhere;
 }
 
 .tail-viewer.no-wrap .tail-line {
-    grid-template-columns: 7.5rem 22rem max-content;
     min-width: max-content;
 }
 
@@ -642,9 +624,6 @@ summary:focus-visible {
         flex-wrap: wrap;
     }
 
-    .tail-line {
-        grid-template-columns: 6.5rem minmax(8rem, 15rem) minmax(0, 1fr);
-    }
 }
 
 @media (max-width: 520px) {
@@ -678,19 +657,7 @@ summary:focus-visible {
     }
 
     .tail-line {
-        display: block;
         padding: 0.4rem 0.5rem;
-    }
-
-    .tail-time,
-    .tail-source {
-        display: inline-block;
-        margin-right: 0.75rem;
-    }
-
-    .tail-message-text {
-        display: block;
-        margin-top: 0.2rem;
     }
 }
 

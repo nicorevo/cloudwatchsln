@@ -80,25 +80,6 @@ function renderProjectOptions(projects) {
     });
 }
 
-function formatTimestamp(value) {
-    if (!value) {
-        return '—';
-    }
-
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) {
-        return value;
-    }
-
-    return date.toLocaleTimeString('it-IT', {
-        timeZone: 'Europe/Rome',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        fractionalSecondDigits: 3
-    });
-}
-
 function createLogLine(line) {
     const classes = ['tail-line'];
     if (line.isException) {
@@ -112,10 +93,8 @@ function createLogLine(line) {
     if (line.isException) {
         row.appendChild(createElement('span', 'sr-only', 'Eccezione: '));
     }
-    row.append(
-        createElement('time', 'tail-time', formatTimestamp(line.timestamp)),
-        createElement('span', 'tail-source', line.source || 'sorgente n/d'),
-        createElement('span', 'tail-message-text', line.message || line.raw || '')
+    row.appendChild(
+        createElement('span', 'tail-message-text', line.raw || line.message || '')
     );
     return row;
 }

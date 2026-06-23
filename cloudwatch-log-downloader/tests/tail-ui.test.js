@@ -46,6 +46,17 @@ test('tail.js limita, deduplica e renderizza in sicurezza', () => {
     assert.doesNotMatch(js, /\.innerHTML\s*=/);
 });
 
+test('tail.js mostra ogni evento come una sola riga di log integrale', () => {
+    const js = fs.readFileSync(path.join(PUBLIC_DIR, 'js', 'tail.js'), 'utf8');
+    const css = fs.readFileSync(path.join(PUBLIC_DIR, 'css', 'monitor.css'), 'utf8');
+
+    assert.match(js, /line\.raw \|\| line\.message/);
+    assert.doesNotMatch(js, /'tail-time'/);
+    assert.doesNotMatch(js, /'tail-source'/);
+    assert.doesNotMatch(css, /\.tail-time/);
+    assert.doesNotMatch(css, /\.tail-source/);
+});
+
 test('tail.js gestisce pausa wrap clear e follow live', () => {
     const js = fs.readFileSync(path.join(PUBLIC_DIR, 'js', 'tail.js'), 'utf8');
 
