@@ -142,6 +142,44 @@ test('incremental tail rispetta limit e segnala hasMore', async () => {
     });
 });
 
+test('incremental tail non costruisce più di limit più una riga', async () => {
+    const lines = Array.from({ length: 200 }, (_, index) =>
+        logLine(
+            `2026-06-23T08:${String(Math.floor(index / 60)).padStart(2, '0')}:${String(index % 60).padStart(2, '0')}.000Z`,
+            'group | api',
+            `line-${index + 1}`
+        )
+    );
+
+    await withLogDirectory({
+        [`${FILE_PREFIX}_2026-06-23_10-00.log`]: lines.slice(0, 1).join('\n') + '\n'
+    }, async logDirectory => {
+        const reader = new ProjectLogTail({
+            filePrefix: FILE_PREFIX,
+            logDirectory,
+            exceptionPatterns: []
+        });
+        const initial = await reader.read({ limit: 20 });
+        await fs.appendFile(
+            path.join(logDirectory, `${FILE_PREFIX}_2026-06-23_10-00.log`),
+            lines.slice(1).join('\n') + '\n'
+        );
+
+        let buildCount = 0;
+        const originalBuildLine = reader.buildLine.bind(reader);
+        reader.buildLine = (...args) => {
+            buildCount += 1;
+            return originalBuildLine(...args);
+        };
+
+        const result = await reader.read({ limit: 20, after: initial.cursor });
+
+        assert.equal(result.lines.length, 20);
+        assert.equal(result.hasMore, true);
+        assert.equal(buildCount, 21);
+    });
+});
+
 test('cursore su file rimosso produce reset senza leggere file non correlati', async () => {
     await withLogDirectory({
         [`${FILE_PREFIX}_2026-06-23_10-00.log`]:

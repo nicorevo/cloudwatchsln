@@ -196,6 +196,14 @@ class ProjectLogTail {
                     lineIndex,
                     line: this.buildLine(filename, lineIndex, lines[lineIndex])
                 });
+
+                if (available.length > limit) {
+                    break;
+                }
+            }
+
+            if (available.length > limit) {
+                break;
             }
         }
 
