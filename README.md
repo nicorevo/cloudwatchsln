@@ -76,6 +76,10 @@ Essential fields:
         { "complete": "/eks/my-namespace/my-worker-prod" },
         { "prefix": "/eks/my-namespace/my-cronjob-" }
       ],
+      "logGroupDiscovery": {
+        "activeWindowHours": 4,
+        "refreshIntervalMinutes": 10
+      },
       "exceptionPatterns": [
         " ERROR ",
         "Exception",
@@ -116,7 +120,9 @@ Add more entries to `cloudwatch[]` to monitor additional services in the same pr
 | Field | Purpose |
 |-------|---------|
 | `cloudwatch[].project` | Slug for API paths and UI selector (`^[a-z0-9][a-z0-9-]*$`) |
-| `cloudwatch[].logGroups[]` | CloudWatch log groups to query: use `{ "complete": "..." }` for one full name or `{ "prefix": "..." }` to discover all matching groups at startup |
+| `cloudwatch[].logGroups[]` | CloudWatch log groups to query: use `{ "complete": "..." }` for one full name or `{ "prefix": "..." }` to discover recent matching groups |
+| `cloudwatch[].logGroupDiscovery.activeWindowHours` | Recent activity window for prefix entries |
+| `cloudwatch[].logGroupDiscovery.refreshIntervalMinutes` | Prefix rediscovery interval; `0` disables periodic refresh |
 | `cloudwatch[].exceptionPatterns[]` | Substrings copied into `-exceptions_*` files |
 | `cloudwatch[].excludeExceptionPatterns[]` | Optional substrings that suppress matching exceptions |
 | `cloudwatch[].channels[]` | Optional destinations notified for every newly detected exception |
@@ -132,7 +138,13 @@ Add more entries to `cloudwatch[]` to monitor additional services in the same pr
 ]
 ```
 
-Prefix entries are resolved once at startup with CloudWatch `DescribeLogGroups`; restart the service after changing config or when new generated groups should be picked up. If a prefix matches no groups, startup logs a warning and continues with any other resolved groups.
+Prefix entries are resolved at startup with CloudWatch `DescribeLogGroups` and
+`DescribeLogStreams`. Only groups whose latest stream event is within
+`logGroupDiscovery.activeWindowHours` are monitored. The service repeats prefix
+discovery every `logGroupDiscovery.refreshIntervalMinutes` minutes, so newly
+active generated groups are picked up without restart. Defaults are 4 hours and
+10 minutes; omit `logGroupDiscovery` to use them. If a prefix matches no active
+groups, startup logs a warning and continues with any other resolved groups.
 
 Legacy single-project configs (root `project` + object `cloudwatch`) are auto-migrated at startup.
 
@@ -145,6 +157,8 @@ Other useful fields in `config.sample.json`:
 | `cloudwatch[]` | `monitorPatterns` | `[]` | Empty = all lines in the main file |
 | `cloudwatch[]` | `excludeExceptionPatterns` | `[]` | Excludes false positives matched by `exceptionPatterns` |
 | `cloudwatch[]` | `channels` | `[]` | Notification destinations; enabled Slack channels require their webhook environment variable |
+| `cloudwatch[]` | `logGroupDiscovery.activeWindowHours` | `4` | Prefix groups must have a latest stream event within this many hours |
+| `cloudwatch[]` | `logGroupDiscovery.refreshIntervalMinutes` | `10` | Rediscover prefix groups every N minutes; `0` disables refresh |
 | `cloudwatch[]` | `schedule.downloadInterval` | `*/1 * * * *` | Download cron per project (Europe/Rome) |
 | `cloudwatch[]` | `files.preserveExceptionPairs` | `true` | Do not delete exception/main pairs |
 | `cloudwatch[]` | `logging.level` | `info` | Service log level uses the **first** entry's `logging.level` |
@@ -251,10 +265,11 @@ Then enable the project channel:
 
 Every detected exception produces a separate message containing project,
 environment, timestamp, log group and log stream. It then shows up to 5
-preceding lines, the complete exception marked with `[ECCEZIONE]`, and up to 5
-following lines from the same CloudWatch log stream. Context lines contain
-only UTC time (`HH:mm:ss`) and the normalized application message. The service
-waits at most 30 seconds for the following context.
+preceding lines, the complete exception emphasized in Slack markdown as
+`:rotating_light: [ECCEZIONE]`, and up to 5 following lines from the same
+CloudWatch log stream. Context lines contain only UTC time (`HH:mm:ss`) and the
+normalized application message. The service waits at most 30 seconds for the
+following context.
 
 The exception is never truncated. If the message exceeds Slack's configured
 limit, complete context lines are removed starting with those furthest from
@@ -340,7 +355,7 @@ aws sso login --profile my-aws-sso-profile
 npm run start:prod
 ```
 
-**0 events downloaded** — check `cloudwatch[].logGroups[]`, region, AWS profile, and IAM permissions (`logs:DescribeLogGroups`, `logs:FilterLogEvents`) in the CloudWatch Console.
+**0 events downloaded** — check `cloudwatch[].logGroups[]`, region, AWS profile, `logGroupDiscovery.activeWindowHours`, and IAM permissions (`logs:DescribeLogGroups`, `logs:DescribeLogStreams`, `logs:FilterLogEvents`) in the CloudWatch Console.
 
 **BrokenPipeError during `aws sso login`** — often harmless; verify with `aws sts get-caller-identity --profile ...`.
 
