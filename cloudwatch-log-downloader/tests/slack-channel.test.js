@@ -63,10 +63,10 @@ test('formatSlackMessage include intestazione e righe compatte UTC', () => {
     assert.match(text, /10:15:09 request started/);
     assert.match(
         text,
-        /\*10:15:10 \[ECCEZIONE\] ERROR ''' &lt;!channel&gt; &amp; failure ↵ second line\*/
+        /\*:rotating_light: 10:15:10 \[ECCEZIONE\] ERROR ''' &lt;!channel&gt; &amp; failure ↵ second line\*/
     );
     assert.match(text, /10:15:11 retry planned/);
-    assert.doesNotMatch(text, /Contesto:|\[prima\]|\[dopo\]|rotating_light/);
+    assert.doesNotMatch(text, /Contesto:|\[prima\]|\[dopo\]/);
     assert.doesNotMatch(text, /```/);
     assert.doesNotMatch(text, /<!channel>/);
     assert.doesNotMatch(text, /failure\nsecond/);

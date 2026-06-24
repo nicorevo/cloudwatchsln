@@ -26,7 +26,8 @@ function formatUtcTime(timestamp) {
 
 function formatEventLine(event, isException = false) {
     const marker = isException ? '[ECCEZIONE] ' : '';
-    const line = `${formatUtcTime(event.timestamp)} ${marker}${sanitizeSlackText(event.message)}`;
+    const alert = isException ? ':rotating_light: ' : '';
+    const line = `${alert}${formatUtcTime(event.timestamp)} ${marker}${sanitizeSlackText(event.message)}`;
     return isException ? `*${line}*` : line;
 }
 
