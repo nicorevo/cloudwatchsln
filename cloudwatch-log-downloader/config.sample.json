@@ -20,8 +20,8 @@
     {
       "project": "prj01",
       "logGroups": [
-        "/eks/my-namespace/my-prj-worker-prod",
-        "/eks/my-namespace/my-prj-services-prod"
+        { "complete": "/eks/my-namespace/my-prj-worker-prod" },
+        { "prefix": "/eks/my-namespace/my-prj-cronjob-" }
       ],
       "filterPattern": "",
       "maxResults": 100000,
@@ -62,8 +62,8 @@
     {
       "project": "prj02",
       "logGroups": [
-        "/eks/my-namespace/my-prj-worker-prod",
-        "/eks/my-namespace/my-prj-api-prod"
+        { "complete": "/eks/my-namespace/my-prj-worker-prod" },
+        { "complete": "/eks/my-namespace/my-prj-api-prod" }
       ],
       "filterPattern": "",
       "maxResults": 100000,

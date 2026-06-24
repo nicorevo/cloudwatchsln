@@ -133,6 +133,8 @@ class CloudWatchLogDownloader {
                 filePrefix: descriptor.filePrefix,
                 logDirectory: descriptor.logDirectoryResolved,
                 logDirectoryDisplay: descriptor.logDirectoryDisplay,
+                configuredLogGroups: descriptor.configuredLogGroups,
+                resolvedLogGroups: descriptor.resolvedLogGroups,
                 exceptionPatterns: descriptor.exceptionPatterns,
                 excludeExceptionPatterns: descriptor.excludeExceptionPatterns
             }))

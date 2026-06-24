@@ -19,6 +19,14 @@ const BASE_MONITOR = {
     port: 3847
 };
 
+function completeLogGroup(name) {
+    return { type: 'complete', name };
+}
+
+function prefixLogGroup(prefix) {
+    return { type: 'prefix', prefix };
+}
+
 function legacyConfig(overrides = {}) {
     return {
         environment: 'prod',
@@ -92,7 +100,7 @@ test('normalizeConfig migra config legacy monoprogetto in cloudwatch[]', () => {
 
     const entry = normalized.cloudwatch[0];
     assert.equal(entry.project, 'prj01');
-    assert.deepEqual(entry.logGroups, ['/eks/ns/worker-prod']);
+    assert.deepEqual(entry.logGroups, [completeLogGroup('/eks/ns/worker-prod')]);
     assert.deepEqual(entry.exceptionPatterns, [' ERROR ']);
     assert.deepEqual(entry.excludeExceptionPatterns, ['Known harmless error']);
     assert.equal(entry.files.filePrefix, 'prj01-logs-prod');
@@ -108,7 +116,66 @@ test('normalizeConfig migra legacy con logGroupName singolo', () => {
         }
     }));
 
-    assert.deepEqual(normalized.cloudwatch[0].logGroups, ['/eks/ns/legacy-prod']);
+    assert.deepEqual(normalized.cloudwatch[0].logGroups, [
+        completeLogGroup('/eks/ns/legacy-prod')
+    ]);
+});
+
+test('normalizeConfig accetta logGroups complete e prefix espliciti', () => {
+    const normalized = normalizeConfig({
+        aws: BASE_AWS,
+        cloudwatch: [multiProjectEntry('prj01', {
+            logGroups: [
+                { complete: '/eks/ns/static-worker-prod' },
+                { prefix: '/eks/ns/generated-worker-' }
+            ]
+        })]
+    });
+
+    assert.deepEqual(normalized.cloudwatch[0].logGroups, [
+        completeLogGroup('/eks/ns/static-worker-prod'),
+        prefixLogGroup('/eks/ns/generated-worker-')
+    ]);
+});
+
+test('normalizeConfig taglia spazi da logGroups complete e prefix', () => {
+    const normalized = normalizeConfig({
+        aws: BASE_AWS,
+        cloudwatch: [multiProjectEntry('prj01', {
+            logGroups: [
+                '  /eks/ns/legacy-prod  ',
+                { complete: '  /eks/ns/static-worker-prod  ' },
+                { prefix: '  /eks/ns/generated-worker-  ' }
+            ]
+        })]
+    });
+
+    assert.deepEqual(normalized.cloudwatch[0].logGroups, [
+        completeLogGroup('/eks/ns/legacy-prod'),
+        completeLogGroup('/eks/ns/static-worker-prod'),
+        prefixLogGroup('/eks/ns/generated-worker-')
+    ]);
+});
+
+test('normalizeConfig rifiuta logGroups non validi', () => {
+    for (const logGroups of [
+        [''],
+        [{ complete: '' }],
+        [{ prefix: '' }],
+        [{ name: '/eks/ns/old-shape' }],
+        [{ type: 'prefix', prefix: '/eks/ns/internal-shape-' }],
+        [{ complete: '/eks/ns/x', prefix: '/eks/ns/' }],
+        [42],
+        [null]
+    ]) {
+        assert.throws(
+            () => normalizeConfig({
+                aws: BASE_AWS,
+                cloudwatch: [multiProjectEntry('prj01', { logGroups })]
+            }),
+            /logGroups\[\] contiene un entry non valido per progetto prj01/
+        );
+    }
 });
 
 test('normalizeConfig normalizza cloudwatch[] multi-progetto', () => {

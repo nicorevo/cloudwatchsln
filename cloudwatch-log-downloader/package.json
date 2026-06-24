@@ -7,7 +7,7 @@
     "start": "CONFIG_ENV=uat node src/index.js",
     "start:uat": "CONFIG_ENV=uat node src/index.js",
     "start:prod": "CONFIG_ENV=prod node src/index.js",
-    "test": "node --test tests/",
+    "test": "node --test tests/*.test.js",
     "dev": "nodemon src/index.js",
     "check-sso-expiry": "node scripts/check-sso-expiry.js",
     "check-sso-expiry:prod": "CONFIG_ENV=prod node scripts/check-sso-expiry.js",

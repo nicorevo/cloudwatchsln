@@ -6,6 +6,7 @@ const CloudWatchLogDownloader = require('../src/index');
 
 const LEGACY_CONFIG = path.join(__dirname, 'fixtures', 'config-legacy.json');
 const MULTI_CONFIG = path.join(__dirname, 'fixtures', 'config-multi.json');
+const COMPLETE_WORKER_LOG_GROUP = { type: 'complete', name: '/eks/ns/worker-prod' };
 
 test('loadConfig normalizza config legacy monoprogetto', async () => {
     const downloader = new CloudWatchLogDownloader({ configPath: LEGACY_CONFIG });
@@ -14,7 +15,9 @@ test('loadConfig normalizza config legacy monoprogetto', async () => {
 
     assert.equal(downloader.config.cloudwatch.length, 1);
     assert.equal(downloader.config.cloudwatch[0].project, 'prj01');
-    assert.deepEqual(downloader.config.cloudwatch[0].logGroups, ['/eks/ns/worker-prod']);
+    assert.deepEqual(downloader.config.cloudwatch[0].logGroups, [
+        COMPLETE_WORKER_LOG_GROUP
+    ]);
     assert.equal(downloader.config.cloudwatch[0].files.filePrefix, 'prj01-logs-prod');
     assert.equal(downloader.config.aws.region, 'eu-central-1');
     assert.equal(downloader.config.monitor.enabled, false);

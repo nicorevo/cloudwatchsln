@@ -28,6 +28,22 @@ function buildSyntheticProjectConfig(rootConfig, entry) {
     };
 }
 
+function toMonitorLogGroupEntry(entry) {
+    if (entry?.type === 'complete') {
+        return { type: 'complete', value: entry.name };
+    }
+
+    if (entry?.type === 'prefix') {
+        return { type: 'prefix', value: entry.prefix };
+    }
+
+    if (typeof entry === 'string') {
+        return { type: 'complete', value: entry };
+    }
+
+    return null;
+}
+
 class ProjectRunner {
     constructor(rootConfig, entry, authManager, logger, options = {}) {
         this.project = entry.project;
@@ -72,6 +88,10 @@ class ProjectRunner {
             project: this.project,
             filePrefix: this.config.files.filePrefix,
             logDirectory: this.config.files.logDirectory,
+            configuredLogGroups: (this.config.cloudwatch.logGroups || [])
+                .map(toMonitorLogGroupEntry)
+                .filter(Boolean),
+            resolvedLogGroups: [...(this.cloudWatchClient.logGroups || [])],
             exceptionPatterns: [...(this.config.cloudwatch.exceptionPatterns || [])],
             excludeExceptionPatterns: [
                 ...(this.config.cloudwatch.excludeExceptionPatterns || [])

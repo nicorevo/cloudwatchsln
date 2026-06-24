@@ -86,6 +86,16 @@ test('monitor.js usa contenuto valido e fuso Europe Rome nelle card', () => {
     assert.match(js, /timeZone: DISPLAY_TIMEZONE/);
 });
 
+test('monitor.js renderizza log group complete e prefix come badge distinti', () => {
+    const js = fs.readFileSync(path.join(PUBLIC_DIR, 'js', 'monitor.js'), 'utf8');
+
+    assert.match(js, /renderLogGroupSummary/);
+    assert.match(js, /configuredLogGroups/);
+    assert.match(js, /log-group-badge/);
+    assert.match(js, /Complete/);
+    assert.match(js, /Prefix/);
+});
+
 test('monitor.js gestisce baseline e nuove eccezioni per progetto', () => {
     const js = fs.readFileSync(path.join(PUBLIC_DIR, 'js', 'monitor.js'), 'utf8');
 
@@ -115,5 +125,8 @@ test('monitor.css definisce griglia card, focus e layout responsive', () => {
     assert.match(css, /:focus-visible/);
     assert.match(css, /@media \(max-width: 900px\)/);
     assert.match(css, /\.project-card\.has-unread-exception/);
+    assert.match(css, /\.log-group-summary/);
+    assert.match(css, /\.log-group-badge\.is-prefix/);
+    assert.match(css, /\.log-group-badge\.is-complete/);
     assert.match(css, /prefers-reduced-motion/);
 });

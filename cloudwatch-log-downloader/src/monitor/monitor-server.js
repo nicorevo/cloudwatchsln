@@ -40,6 +40,8 @@ class MonitorServer {
                 logDirectory: projectConfig.logDirectory,
                 logDirectoryDisplay: projectConfig.logDirectoryDisplay
                     || path.basename(projectConfig.logDirectory),
+                configuredLogGroups: projectConfig.configuredLogGroups || [],
+                resolvedLogGroups: projectConfig.resolvedLogGroups || [],
                 exceptionIndex: new ExceptionIndex(
                     this.config,
                     projectConfig.filePrefix,
@@ -212,7 +214,9 @@ class MonitorServer {
             projects: [...this.projects.values()].map(project => ({
                 id: project.project,
                 filePrefix: project.filePrefix,
-                logDirectory: project.logDirectoryDisplay
+                logDirectory: project.logDirectoryDisplay,
+                configuredLogGroups: project.configuredLogGroups,
+                resolvedLogGroups: project.resolvedLogGroups
             }))
         });
     }
@@ -230,6 +234,8 @@ class MonitorServer {
                     return {
                         id: project.project,
                         status: this.resolveDashboardStatus(metrics),
+                        configuredLogGroups: project.configuredLogGroups,
+                        resolvedLogGroups: project.resolvedLogGroups,
                         metrics
                     };
                 } catch (error) {
@@ -241,6 +247,8 @@ class MonitorServer {
                     return {
                         id: project.project,
                         status: 'error',
+                        configuredLogGroups: project.configuredLogGroups,
+                        resolvedLogGroups: project.resolvedLogGroups,
                         metrics: null,
                         error: {
                             code: 'PROJECT_METRICS_UNAVAILABLE',
@@ -334,6 +342,8 @@ class MonitorServer {
             monitorEnabled: this.config.enabled,
             logDirectory: project.logDirectoryDisplay,
             filePrefix: project.filePrefix,
+            configuredLogGroups: project.configuredLogGroups,
+            resolvedLogGroups: project.resolvedLogGroups,
             exceptionFileCount,
             treeRefreshSeconds: this.config.treeRefreshSeconds
         });

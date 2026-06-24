@@ -32,13 +32,46 @@ function isLegacyCloudwatchConfig(config) {
         && !Array.isArray(config.cloudwatch);
 }
 
-function resolveLogGroups(source) {
+function normalizeLogGroupEntry(entry, project) {
+    if (typeof entry === 'string') {
+        const name = entry.trim();
+        if (name) {
+            return { type: 'complete', name };
+        }
+    }
+
+    if (entry && typeof entry === 'object' && !Array.isArray(entry)) {
+        const hasType = Object.prototype.hasOwnProperty.call(entry, 'type');
+        const hasComplete = Object.prototype.hasOwnProperty.call(entry, 'complete');
+        const hasPrefix = Object.prototype.hasOwnProperty.call(entry, 'prefix');
+
+        if (!hasType && hasComplete !== hasPrefix) {
+            if (hasComplete && typeof entry.complete === 'string') {
+                const name = entry.complete.trim();
+                if (name) {
+                    return { type: 'complete', name };
+                }
+            }
+
+            if (hasPrefix && typeof entry.prefix === 'string') {
+                const prefix = entry.prefix.trim();
+                if (prefix) {
+                    return { type: 'prefix', prefix };
+                }
+            }
+        }
+    }
+
+    throw new Error(`logGroups[] contiene un entry non valido per progetto ${project}`);
+}
+
+function resolveLogGroups(source, project = 'unknown') {
     if (Array.isArray(source.logGroups) && source.logGroups.length > 0) {
-        return source.logGroups.filter(Boolean);
+        return source.logGroups.map(entry => normalizeLogGroupEntry(entry, project));
     }
 
     if (source.logGroupName) {
-        return [source.logGroupName];
+        return [normalizeLogGroupEntry(source.logGroupName, project)];
     }
 
     return [];
@@ -71,7 +104,7 @@ function normalizeLogging(logging = {}) {
 
 function normalizeCloudwatchFields(source = {}) {
     return {
-        logGroups: resolveLogGroups(source),
+        logGroups: resolveLogGroups(source, source.project),
         filterPattern: source.filterPattern ?? DEFAULT_CLOUDWATCH_FIELDS.filterPattern,
         maxResults: source.maxResults ?? DEFAULT_CLOUDWATCH_FIELDS.maxResults,
         monitorPatterns: Array.isArray(source.monitorPatterns)
@@ -169,7 +202,7 @@ function migrateLegacyConfig(config) {
 
     return [{
         project: config.project,
-        ...normalizeCloudwatchFields(config.cloudwatch),
+        ...config.cloudwatch,
         channels: config.cloudwatch.channels,
         schedule: config.schedule,
         files: config.files,

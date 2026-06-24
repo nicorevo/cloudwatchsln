@@ -34,7 +34,16 @@ function singleProject(projects = []) {
         project: 'my-app',
         filePrefix: FILE_PREFIX,
         logDirectory: FIXTURE_DIR,
-        logDirectoryDisplay: './logs'
+        logDirectoryDisplay: './logs',
+        configuredLogGroups: [
+            { type: 'complete', value: '/eks/ns/static-worker-prod' },
+            { type: 'prefix', value: '/eks/ns/generated-worker-' }
+        ],
+        resolvedLogGroups: [
+            '/eks/ns/static-worker-prod',
+            '/eks/ns/generated-worker-001',
+            '/eks/ns/generated-worker-002'
+        ]
     }];
 }
 
@@ -73,6 +82,15 @@ test('monitor server espone lista progetti', async () => {
         assert.equal(projects.projects.length, 1);
         assert.equal(projects.projects[0].id, 'my-app');
         assert.equal(projects.projects[0].filePrefix, FILE_PREFIX);
+        assert.deepEqual(projects.projects[0].configuredLogGroups, [
+            { type: 'complete', value: '/eks/ns/static-worker-prod' },
+            { type: 'prefix', value: '/eks/ns/generated-worker-' }
+        ]);
+        assert.deepEqual(projects.projects[0].resolvedLogGroups, [
+            '/eks/ns/static-worker-prod',
+            '/eks/ns/generated-worker-001',
+            '/eks/ns/generated-worker-002'
+        ]);
         assert.equal(projects.projects[0].exceptionPatterns, undefined);
         assert.equal(projects.projects[0].excludeExceptionPatterns, undefined);
     } finally {
@@ -321,6 +339,8 @@ test('monitor server espone dashboard aggregata ordinata per attività recente',
         assert.deepEqual(dashboard.projects[0], {
             id: 'active-service',
             status: 'active',
+            configuredLogGroups: [],
+            resolvedLogGroups: [],
             metrics: {
                 retainedExceptionCount: 2,
                 lastHourExceptionCount: 1,
@@ -367,6 +387,8 @@ test('monitor server isola errore metriche di un progetto', async () => {
         assert.deepEqual(response.body.projects[0], {
             id: 'healthy-service',
             status: 'inactive',
+            configuredLogGroups: [],
+            resolvedLogGroups: [],
             metrics: {
                 retainedExceptionCount: 0,
                 lastHourExceptionCount: 0,
@@ -378,6 +400,8 @@ test('monitor server isola errore metriche di un progetto', async () => {
         assert.deepEqual(response.body.projects[1], {
             id: 'broken-service',
             status: 'error',
+            configuredLogGroups: [],
+            resolvedLogGroups: [],
             metrics: null,
             error: {
                 code: 'PROJECT_METRICS_UNAVAILABLE',

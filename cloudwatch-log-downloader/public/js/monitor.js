@@ -178,6 +178,54 @@ function createMetric(label, value) {
     return metric;
 }
 
+function getLogGroupLabel(type) {
+    return type === 'prefix' ? 'Prefix' : 'Complete';
+}
+
+function renderLogGroupSummary(project) {
+    const configured = Array.isArray(project.configuredLogGroups)
+        ? project.configuredLogGroups
+        : [];
+    const resolved = Array.isArray(project.resolvedLogGroups)
+        ? project.resolvedLogGroups
+        : [];
+    const summary = createElement('div', 'log-group-summary');
+
+    const label = createElement('span', 'metric-label', 'Log group');
+    const count = createElement(
+        'strong',
+        'log-group-count',
+        `${resolved.length} risolti`
+    );
+    summary.append(label, count);
+
+    if (configured.length === 0) {
+        summary.appendChild(createElement('span', 'log-group-empty', 'Nessuna configurazione'));
+        return summary;
+    }
+
+    const badges = createElement('div', 'log-group-badges');
+    configured.slice(0, 3).forEach(group => {
+        const type = group.type === 'prefix' ? 'prefix' : 'complete';
+        const badge = createElement(
+            'span',
+            `log-group-badge is-${type}`,
+            `${getLogGroupLabel(type)}: ${group.value || '—'}`
+        );
+        badge.title = group.value || '';
+        badges.appendChild(badge);
+    });
+
+    if (configured.length > 3) {
+        badges.appendChild(
+            createElement('span', 'log-group-badge is-more', `+${configured.length - 3}`)
+        );
+    }
+
+    summary.appendChild(badges);
+    return summary;
+}
+
 function createProjectCard(project) {
     const unread = project.status !== 'error' && hasUnreadException(project);
     const cardClasses = [
@@ -209,6 +257,8 @@ function createProjectCard(project) {
             )
         );
     } else {
+        button.appendChild(renderLogGroupSummary(project));
+
         const metrics = createElement('div', 'metrics-grid');
         metrics.append(
             createMetric('Conservate', project.metrics.retainedExceptionCount),

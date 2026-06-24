@@ -14,9 +14,11 @@ const ROOT_CONFIG = {
     }
 };
 
+const COMPLETE_LOG_GROUP = { type: 'complete', name: '/eks/ns/worker-prod' };
+
 const PROJECT_ENTRY = {
     project: 'prj01',
-    logGroups: ['/eks/ns/worker-prod'],
+    logGroups: [COMPLETE_LOG_GROUP],
     filterPattern: 'ERROR',
     maxResults: 50000,
     monitorPatterns: [],
@@ -60,7 +62,7 @@ test('buildSyntheticProjectConfig shaped come config monoprogetto', () => {
     assert.equal(config.environment, 'prod');
     assert.equal(config.project, 'prj01');
     assert.deepEqual(config.aws, ROOT_CONFIG.aws);
-    assert.deepEqual(config.cloudwatch.logGroups, ['/eks/ns/worker-prod']);
+    assert.deepEqual(config.cloudwatch.logGroups, [COMPLETE_LOG_GROUP]);
     assert.equal(config.cloudwatch.filterPattern, 'ERROR');
     assert.equal(config.cloudwatch.maxResults, 50000);
     assert.deepEqual(
@@ -316,6 +318,10 @@ test('ProjectRunner getMonitorDescriptor espone metadati monitor', () => {
         project: 'prj01',
         filePrefix: 'prj01-logs-prod',
         logDirectory: './logs',
+        configuredLogGroups: [
+            { type: 'complete', value: '/eks/ns/worker-prod' }
+        ],
+        resolvedLogGroups: [],
         exceptionPatterns: [' ERROR '],
         excludeExceptionPatterns: ['Known harmless error']
     });

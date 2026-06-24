@@ -1,4 +1,8 @@
-const { CloudWatchLogsClient, FilterLogEventsCommand } = require('@aws-sdk/client-cloudwatch-logs');
+const {
+    CloudWatchLogsClient,
+    DescribeLogGroupsCommand,
+    FilterLogEventsCommand
+} = require('@aws-sdk/client-cloudwatch-logs');
 const { buildSsoExpiredError, isTokenError } = require('./aws-auth-manager');
 
 class CloudWatchClient {
@@ -6,7 +10,8 @@ class CloudWatchClient {
         this.config = config;
         this.logger = logger;
         this.authManager = authManager;
-        this.logGroups = this.resolveLogGroups();
+        this.logGroupEntries = this.resolveLogGroupEntries();
+        this.logGroups = this.resolveCompleteLogGroups();
         this.usesLegacyPodKeywords = this.logGroups.length === 1
             && !!this.config.cloudwatch.logGroupName
             && !this.config.cloudwatch.logGroups?.length
@@ -16,23 +21,54 @@ class CloudWatchClient {
         this.initialized = false;
     }
 
-    resolveLogGroups() {
+    normalizeLogGroupEntry(entry) {
+        if (typeof entry === 'string' && entry.trim()) {
+            return { type: 'complete', name: entry.trim() };
+        }
+
+        if (entry?.type === 'complete' && typeof entry.name === 'string') {
+            const name = entry.name.trim();
+            return name ? { type: 'complete', name } : null;
+        }
+
+        if (entry?.type === 'prefix' && typeof entry.prefix === 'string') {
+            const prefix = entry.prefix.trim();
+            return prefix ? { type: 'prefix', prefix } : null;
+        }
+
+        if (entry?.complete && typeof entry.complete === 'string') {
+            const name = entry.complete.trim();
+            return name ? { type: 'complete', name } : null;
+        }
+
+        if (entry?.prefix && typeof entry.prefix === 'string') {
+            const prefix = entry.prefix.trim();
+            return prefix ? { type: 'prefix', prefix } : null;
+        }
+
+        return null;
+    }
+
+    resolveLogGroupEntries() {
         const { cloudwatch } = this.config;
 
         if (Array.isArray(cloudwatch.logGroups) && cloudwatch.logGroups.length > 0) {
-            return cloudwatch.logGroups.map(entry => {
-                if (typeof entry === 'string') {
-                    return entry;
-                }
-                return entry.name;
-            }).filter(Boolean);
+            return cloudwatch.logGroups
+                .map(entry => this.normalizeLogGroupEntry(entry))
+                .filter(Boolean);
         }
 
         if (cloudwatch.logGroupName) {
-            return [cloudwatch.logGroupName];
+            return [{ type: 'complete', name: cloudwatch.logGroupName }];
         }
 
         return [];
+    }
+
+    resolveCompleteLogGroups() {
+        return this.logGroupEntries
+            .filter(entry => entry.type === 'complete')
+            .map(entry => entry.name);
     }
 
     async init(options = {}) {
@@ -41,6 +77,7 @@ class CloudWatchClient {
         }
 
         await this.rebuildClient();
+        await this.resolveConfiguredLogGroups();
 
         if (!options.skipCredentialTest) {
             await this.testCredentials();
@@ -54,6 +91,81 @@ class CloudWatchClient {
             region: this.config.aws.region,
             credentials: this.authManager.getCredentialProvider()
         });
+    }
+
+    addUniqueLogGroup(target, seen, logGroupName) {
+        if (!logGroupName || seen.has(logGroupName)) {
+            return;
+        }
+
+        seen.add(logGroupName);
+        target.push(logGroupName);
+    }
+
+    async discoverLogGroupsByPrefix(prefix) {
+        const discovered = [];
+        let nextToken = null;
+
+        do {
+            try {
+                const params = { logGroupNamePrefix: prefix };
+                if (nextToken) {
+                    params.nextToken = nextToken;
+                }
+
+                const response = await this.client.send(
+                    new DescribeLogGroupsCommand(params)
+                );
+                discovered.push(
+                    ...(response.logGroups || [])
+                        .map(group => group.logGroupName)
+                        .filter(Boolean)
+                );
+                nextToken = response.nextToken;
+            } catch (error) {
+                this.handleAuthError(error);
+            }
+        } while (nextToken);
+
+        discovered.sort();
+
+        if (discovered.length === 0) {
+            this.logger.warn('Nessun log group trovato per il prefix CloudWatch', {
+                prefix
+            });
+        } else {
+            this.logger.info('Log group CloudWatch risolti da prefix', {
+                prefix,
+                count: discovered.length
+            });
+        }
+
+        return discovered;
+    }
+
+    async resolveConfiguredLogGroups() {
+        const resolved = [];
+        const seen = new Set();
+
+        for (const entry of this.logGroupEntries) {
+            if (entry.type === 'complete') {
+                this.addUniqueLogGroup(resolved, seen, entry.name);
+                continue;
+            }
+
+            if (entry.type === 'prefix') {
+                const discovered = await this.discoverLogGroupsByPrefix(entry.prefix);
+                for (const logGroupName of discovered) {
+                    this.addUniqueLogGroup(resolved, seen, logGroupName);
+                }
+            }
+        }
+
+        if (resolved.length === 0) {
+            throw new Error('Nessun log group CloudWatch risolto dalla configurazione');
+        }
+
+        this.logGroups = resolved;
     }
 
     ensureInitialized() {

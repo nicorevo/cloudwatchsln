@@ -73,8 +73,8 @@ Essential fields:
     {
       "project": "my-application",
       "logGroups": [
-        "/eks/my-namespace/my-worker-prod",
-        "/eks/my-namespace/my-api-prod"
+        { "complete": "/eks/my-namespace/my-worker-prod" },
+        { "prefix": "/eks/my-namespace/my-cronjob-" }
       ],
       "exceptionPatterns": [
         " ERROR ",
@@ -116,12 +116,23 @@ Add more entries to `cloudwatch[]` to monitor additional services in the same pr
 | Field | Purpose |
 |-------|---------|
 | `cloudwatch[].project` | Slug for API paths and UI selector (`^[a-z0-9][a-z0-9-]*$`) |
-| `cloudwatch[].logGroups[]` | CloudWatch paths to query (preferred on EKS) |
+| `cloudwatch[].logGroups[]` | CloudWatch log groups to query: use `{ "complete": "..." }` for one full name or `{ "prefix": "..." }` to discover all matching groups at startup |
 | `cloudwatch[].exceptionPatterns[]` | Substrings copied into `-exceptions_*` files |
 | `cloudwatch[].excludeExceptionPatterns[]` | Optional substrings that suppress matching exceptions |
 | `cloudwatch[].channels[]` | Optional destinations notified for every newly detected exception |
 | `cloudwatch[].files.filePrefix` | Filename prefix under `./logs/` (must be unique per entry) |
 | `monitor.enabled` | Exception UI at `http://127.0.0.1:3847` |
+
+`logGroups[]` still accepts legacy string entries as complete names, but new configs should prefer explicit objects:
+
+```json
+"logGroups": [
+  { "complete": "/eks/my-namespace/my-api-prod" },
+  { "prefix": "/eks/my-namespace/my-hourly-job-" }
+]
+```
+
+Prefix entries are resolved once at startup with CloudWatch `DescribeLogGroups`; restart the service after changing config or when new generated groups should be picked up. If a prefix matches no groups, startup logs a warning and continues with any other resolved groups.
 
 Legacy single-project configs (root `project` + object `cloudwatch`) are auto-migrated at startup.
 
@@ -329,7 +340,7 @@ aws sso login --profile my-aws-sso-profile
 npm run start:prod
 ```
 
-**0 events downloaded** — check `cloudwatch[].logGroups[]`, region, and AWS profile in the CloudWatch Console.
+**0 events downloaded** — check `cloudwatch[].logGroups[]`, region, AWS profile, and IAM permissions (`logs:DescribeLogGroups`, `logs:FilterLogEvents`) in the CloudWatch Console.
 
 **BrokenPipeError during `aws sso login`** — often harmless; verify with `aws sts get-caller-identity --profile ...`.
 

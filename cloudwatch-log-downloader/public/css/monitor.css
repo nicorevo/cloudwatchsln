@@ -188,6 +188,55 @@ summary:focus-visible {
     text-transform: uppercase;
 }
 
+.log-group-summary {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border);
+}
+
+.log-group-count {
+    display: block;
+    margin-top: 0.15rem;
+    color: var(--text);
+    font-size: 0.9rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.log-group-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-top: 0.65rem;
+}
+
+.log-group-badge {
+    max-width: 100%;
+    overflow: hidden;
+    padding: 0.28rem 0.45rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-size: 0.72rem;
+    line-height: 1.25;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.log-group-badge.is-prefix {
+    border-color: rgba(245, 158, 11, 0.5);
+    background: rgba(245, 158, 11, 0.1);
+}
+
+.log-group-badge.is-complete {
+    border-color: rgba(59, 130, 246, 0.45);
+    background: rgba(59, 130, 246, 0.08);
+}
+
+.log-group-badge.is-more,
+.log-group-empty {
+    color: var(--muted);
+}
+
 .metrics-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
