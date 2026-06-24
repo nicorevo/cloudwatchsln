@@ -23,6 +23,10 @@
         { "complete": "/eks/my-namespace/my-prj-worker-prod" },
         { "prefix": "/eks/my-namespace/my-prj-cronjob-" }
       ],
+      "logGroupDiscovery": {
+        "activeWindowHours": 4,
+        "refreshIntervalMinutes": 10
+      },
       "filterPattern": "",
       "maxResults": 100000,
       "monitorPatterns": [],

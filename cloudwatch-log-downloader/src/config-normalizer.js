@@ -26,6 +26,11 @@ const DEFAULT_CLOUDWATCH_FIELDS = {
     excludeExceptionPatterns: []
 };
 
+const DEFAULT_LOG_GROUP_DISCOVERY = {
+    activeWindowHours: 4,
+    refreshIntervalMinutes: 10
+};
+
 function isLegacyCloudwatchConfig(config) {
     return config.cloudwatch
         && typeof config.cloudwatch === 'object'
@@ -105,6 +110,10 @@ function normalizeLogging(logging = {}) {
 function normalizeCloudwatchFields(source = {}) {
     return {
         logGroups: resolveLogGroups(source, source.project),
+        logGroupDiscovery: normalizeLogGroupDiscovery(
+            source.logGroupDiscovery,
+            source.project
+        ),
         filterPattern: source.filterPattern ?? DEFAULT_CLOUDWATCH_FIELDS.filterPattern,
         maxResults: source.maxResults ?? DEFAULT_CLOUDWATCH_FIELDS.maxResults,
         monitorPatterns: Array.isArray(source.monitorPatterns)
@@ -116,6 +125,41 @@ function normalizeCloudwatchFields(source = {}) {
         excludeExceptionPatterns: Array.isArray(source.excludeExceptionPatterns)
             ? [...source.excludeExceptionPatterns]
             : []
+    };
+}
+
+function isNonNegativeNumber(value) {
+    return typeof value === 'number' && Number.isFinite(value) && value >= 0;
+}
+
+function isNonNegativeInteger(value) {
+    return Number.isInteger(value) && value >= 0;
+}
+
+function isPositiveNumber(value) {
+    return isNonNegativeNumber(value) && value > 0;
+}
+
+function normalizeLogGroupDiscovery(discovery = {}, project = 'unknown') {
+    if (discovery === null || typeof discovery !== 'object' || Array.isArray(discovery)) {
+        throw new Error(`logGroupDiscovery non valido per progetto ${project}`);
+    }
+
+    const activeWindowHours = discovery.activeWindowHours
+        ?? DEFAULT_LOG_GROUP_DISCOVERY.activeWindowHours;
+    const refreshIntervalMinutes = discovery.refreshIntervalMinutes
+        ?? DEFAULT_LOG_GROUP_DISCOVERY.refreshIntervalMinutes;
+
+    if (
+        !isPositiveNumber(activeWindowHours)
+        || !isNonNegativeInteger(refreshIntervalMinutes)
+    ) {
+        throw new Error(`logGroupDiscovery non valido per progetto ${project}`);
+    }
+
+    return {
+        activeWindowHours,
+        refreshIntervalMinutes
     };
 }
 
@@ -302,6 +346,7 @@ module.exports = {
     DEFAULT_FILES,
     DEFAULT_LOGGING,
     DEFAULT_CLOUDWATCH_FIELDS,
+    DEFAULT_LOG_GROUP_DISCOVERY,
     normalizeConfig,
     normalizeCloudwatchEntries,
     normalizeChannels,

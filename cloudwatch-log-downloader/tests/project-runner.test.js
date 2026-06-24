@@ -21,6 +21,10 @@ const PROJECT_ENTRY = {
     logGroups: [COMPLETE_LOG_GROUP],
     filterPattern: 'ERROR',
     maxResults: 50000,
+    logGroupDiscovery: {
+        activeWindowHours: 4,
+        refreshIntervalMinutes: 10
+    },
     monitorPatterns: [],
     exceptionPatterns: [' ERROR '],
     excludeExceptionPatterns: ['Known harmless error'],
@@ -65,6 +69,10 @@ test('buildSyntheticProjectConfig shaped come config monoprogetto', () => {
     assert.deepEqual(config.cloudwatch.logGroups, [COMPLETE_LOG_GROUP]);
     assert.equal(config.cloudwatch.filterPattern, 'ERROR');
     assert.equal(config.cloudwatch.maxResults, 50000);
+    assert.deepEqual(config.cloudwatch.logGroupDiscovery, {
+        activeWindowHours: 4,
+        refreshIntervalMinutes: 10
+    });
     assert.deepEqual(
         config.cloudwatch.excludeExceptionPatterns,
         ['Known harmless error']
@@ -73,6 +81,51 @@ test('buildSyntheticProjectConfig shaped come config monoprogetto', () => {
     assert.deepEqual(config.schedule, PROJECT_ENTRY.schedule);
     assert.deepEqual(config.files, PROJECT_ENTRY.files);
     assert.deepEqual(config.logging, PROJECT_ENTRY.logging);
+});
+
+test('ProjectRunner refreshLogGroupDiscovery delega a CloudWatchClient', async () => {
+    let refreshed = false;
+    const runner = new ProjectRunner(ROOT_CONFIG, PROJECT_ENTRY, {}, createLogger(), {
+        cloudWatchClient: {
+            async refreshConfiguredLogGroups() {
+                refreshed = true;
+                return ['/eks/ns/worker-prod'];
+            },
+            async fetchLogsPaginated() { return []; }
+        },
+        fileManager: {
+            async cleanupOldFiles() {},
+            async getFileList() { return []; }
+        }
+    });
+
+    await runner.refreshLogGroupDiscovery();
+
+    assert.equal(refreshed, true);
+});
+
+test('ProjectRunner refreshLogGroupDiscovery non propaga errori CloudWatch', async () => {
+    const logger = createLogger();
+    const runner = new ProjectRunner(ROOT_CONFIG, PROJECT_ENTRY, {}, logger, {
+        cloudWatchClient: {
+            async refreshConfiguredLogGroups() {
+                throw new Error('DescribeLogGroups throttled');
+            },
+            async fetchLogsPaginated() { return []; }
+        },
+        fileManager: {
+            async cleanupOldFiles() {},
+            async getFileList() { return []; }
+        }
+    });
+
+    await runner.refreshLogGroupDiscovery();
+
+    assert.ok(logger.calls.some(call =>
+        call.level === 'error'
+        && call.message === 'Errore durante la discovery dei log group CloudWatch'
+        && call.data.project === 'prj01'
+    ));
 });
 
 test('ProjectRunner downloadLogs scrive eventi e aggiorna lastProcessedTime', async () => {

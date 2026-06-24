@@ -137,17 +137,106 @@ test('stopScheduledJobs ferma tutti i cron registrati', () => {
     downloader.scheduledJobs = [
         {
             downloadJob: { stop() { stopped.push('d1'); } },
-            cleanupJob: { stop() { stopped.push('c1'); } }
+            cleanupJob: { stop() { stopped.push('c1'); } },
+            discoveryJob: { stop() { stopped.push('r1'); } }
         },
         {
             downloadJob: { stop() { stopped.push('d2'); } },
-            cleanupJob: { stop() { stopped.push('c2'); } }
+            cleanupJob: { stop() { stopped.push('c2'); } },
+            discoveryJob: null
         }
     ];
 
     downloader.stopScheduledJobs();
 
-    assert.deepEqual(stopped.sort(), ['c1', 'c2', 'd1', 'd2']);
+    assert.deepEqual(stopped.sort(), ['c1', 'c2', 'd1', 'd2', 'r1']);
+});
+
+test('startScheduledJobs schedula refresh discovery per progetti con prefix', () => {
+    const scheduled = [];
+    const fakeCron = {
+        schedule(interval, handler, options) {
+            const job = {
+                interval,
+                handler,
+                options,
+                stopped: false,
+                stop() { this.stopped = true; }
+            };
+            scheduled.push(job);
+            return job;
+        }
+    };
+    const downloader = new CloudWatchLogDownloader({
+        configPath: MULTI_CONFIG,
+        cron: fakeCron
+    });
+    const refreshCalls = [];
+    downloader.logger = { info() {}, warn() {}, error() {} };
+    downloader.config = {
+        aws: { credentialRefreshIntervalMinutes: 55 },
+        cloudwatch: [],
+        monitor: { enabled: false }
+    };
+    downloader.startCredentialRefreshJob = () => {};
+    downloader.registerShutdownHandlers = () => {};
+    downloader.projectRunners = [
+        {
+            project: 'with-prefix',
+            config: {
+                schedule: {
+                    downloadInterval: '*/1 * * * *',
+                    cleanupInterval: '*/60 * * * *'
+                },
+                cloudwatch: {
+                    logGroups: [{ type: 'prefix', prefix: '/eks/ns/job-' }],
+                    logGroupDiscovery: {
+                        activeWindowHours: 4,
+                        refreshIntervalMinutes: 10
+                    }
+                }
+            },
+            async downloadLogs() {},
+            async cleanupOldFiles() {},
+            async refreshLogGroupDiscovery() { refreshCalls.push('with-prefix'); }
+        },
+        {
+            project: 'complete-only',
+            config: {
+                schedule: {
+                    downloadInterval: '*/2 * * * *',
+                    cleanupInterval: '*/30 * * * *'
+                },
+                cloudwatch: {
+                    logGroups: [{ type: 'complete', name: '/eks/ns/api' }],
+                    logGroupDiscovery: {
+                        activeWindowHours: 4,
+                        refreshIntervalMinutes: 10
+                    }
+                }
+            },
+            async downloadLogs() {},
+            async cleanupOldFiles() {},
+            async refreshLogGroupDiscovery() { refreshCalls.push('complete-only'); }
+        }
+    ];
+
+    downloader.startScheduledJobs();
+
+    assert.equal(scheduled.length, 5);
+    assert.equal(
+        scheduled.some(job => job.interval === '*/10 * * * *'),
+        true
+    );
+
+    const discoveryJob = downloader.scheduledJobs.find(job =>
+        job.project === 'with-prefix'
+    ).discoveryJob;
+    assert.ok(discoveryJob);
+
+    discoveryJob.handler();
+
+    assert.deepEqual(refreshCalls, ['with-prefix']);
 });
 
 test('registerShutdownHandlers registra listener una sola volta', () => {

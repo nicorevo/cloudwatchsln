@@ -15,6 +15,7 @@ class CloudWatchLogDownloader {
         this.configPath = options.configPath ?? this.resolveConfigPath();
         this.ProjectRunnerClass = options.ProjectRunnerClass ?? ProjectRunner;
         this.AwsAuthManagerClass = options.AwsAuthManagerClass ?? AwsAuthManager;
+        this.cron = options.cron ?? cron;
         this.config = null;
         this.logger = null;
         this.authManager = null;
@@ -189,34 +190,55 @@ class CloudWatchLogDownloader {
     startScheduledJobs() {
         this.scheduledJobs = this.projectRunners.map(runner => {
             const { downloadInterval, cleanupInterval } = runner.config.schedule;
-            const downloadJob = cron.schedule(downloadInterval, async () => {
+            const discoveryIntervalMinutes = runner.config.cloudwatch
+                .logGroupDiscovery?.refreshIntervalMinutes ?? 10;
+            const hasPrefixDiscovery = (runner.config.cloudwatch.logGroups || [])
+                .some(entry => entry?.type === 'prefix');
+            const downloadJob = this.cron.schedule(downloadInterval, async () => {
                 await runner.downloadLogs();
             }, {
                 scheduled: true,
                 timezone: 'Europe/Rome'
             });
 
-            const cleanupJob = cron.schedule(cleanupInterval, async () => {
+            const cleanupJob = this.cron.schedule(cleanupInterval, async () => {
                 await runner.cleanupOldFiles();
             }, {
                 scheduled: true,
                 timezone: 'Europe/Rome'
             });
 
+            const discoveryJob = hasPrefixDiscovery && discoveryIntervalMinutes > 0
+                ? this.cron.schedule(`*/${discoveryIntervalMinutes} * * * *`, async () => {
+                    await runner.refreshLogGroupDiscovery();
+                }, {
+                    scheduled: true,
+                    timezone: 'Europe/Rome'
+                })
+                : null;
+
             return {
                 project: runner.project,
                 downloadInterval,
                 cleanupInterval,
+                discoveryIntervalMinutes: discoveryJob ? discoveryIntervalMinutes : null,
                 downloadJob,
-                cleanupJob
+                cleanupJob,
+                discoveryJob
             };
         });
 
         this.logger.info('Scheduled jobs started', {
-            projects: this.scheduledJobs.map(({ project, downloadInterval, cleanupInterval }) => ({
+            projects: this.scheduledJobs.map(({
                 project,
                 downloadInterval,
-                cleanupInterval
+                cleanupInterval,
+                discoveryIntervalMinutes
+            }) => ({
+                project,
+                downloadInterval,
+                cleanupInterval,
+                discoveryIntervalMinutes
             })),
             credentialRefreshIntervalMinutes: this.config.aws.credentialRefreshIntervalMinutes
         });
@@ -229,6 +251,7 @@ class CloudWatchLogDownloader {
         for (const job of this.scheduledJobs) {
             job.downloadJob.stop();
             job.cleanupJob.stop();
+            job.discoveryJob?.stop();
         }
         this.scheduledJobs = [];
     }

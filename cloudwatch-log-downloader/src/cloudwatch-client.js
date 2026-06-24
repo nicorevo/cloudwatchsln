@@ -1,6 +1,7 @@
 const {
     CloudWatchLogsClient,
     DescribeLogGroupsCommand,
+    DescribeLogStreamsCommand,
     FilterLogEventsCommand
 } = require('@aws-sdk/client-cloudwatch-logs');
 const { buildSsoExpiredError, isTokenError } = require('./aws-auth-manager');
@@ -19,6 +20,7 @@ class CloudWatchClient {
             && this.config.cloudwatch.podKeywords.length > 0;
         this.client = null;
         this.initialized = false;
+        this.refreshInProgress = false;
     }
 
     normalizeLogGroupEntry(entry) {
@@ -77,7 +79,10 @@ class CloudWatchClient {
         }
 
         await this.rebuildClient();
-        await this.resolveConfiguredLogGroups();
+        await this.resolveConfiguredLogGroups({
+            now: options.now,
+            failIfEmpty: true
+        });
 
         if (!options.skipCredentialTest) {
             await this.testCredentials();
@@ -102,9 +107,34 @@ class CloudWatchClient {
         target.push(logGroupName);
     }
 
-    async discoverLogGroupsByPrefix(prefix) {
+    getDiscoveryWindowStart(now = Date.now()) {
+        const activeWindowHours = this.config.cloudwatch.logGroupDiscovery
+            ?.activeWindowHours ?? 4;
+        return now - (activeWindowHours * 60 * 60 * 1000);
+    }
+
+    async isLogGroupActive(logGroupName, windowStart) {
+        try {
+            const response = await this.client.send(
+                new DescribeLogStreamsCommand({
+                    logGroupName,
+                    orderBy: 'LastEventTime',
+                    descending: true,
+                    limit: 1
+                })
+            );
+            const latestStream = (response.logStreams || [])[0];
+            return Number(latestStream?.lastEventTimestamp) >= windowStart;
+        } catch (error) {
+            this.handleAuthError(error);
+        }
+    }
+
+    async discoverLogGroupsByPrefix(prefix, options = {}) {
         const discovered = [];
+        let ignoredCount = 0;
         let nextToken = null;
+        const windowStart = this.getDiscoveryWindowStart(options.now);
 
         do {
             try {
@@ -116,11 +146,16 @@ class CloudWatchClient {
                 const response = await this.client.send(
                     new DescribeLogGroupsCommand(params)
                 );
-                discovered.push(
-                    ...(response.logGroups || [])
-                        .map(group => group.logGroupName)
-                        .filter(Boolean)
-                );
+                const logGroupNames = (response.logGroups || [])
+                    .map(group => group.logGroupName)
+                    .filter(Boolean);
+                for (const logGroupName of logGroupNames) {
+                    if (await this.isLogGroupActive(logGroupName, windowStart)) {
+                        discovered.push(logGroupName);
+                    } else {
+                        ignoredCount++;
+                    }
+                }
                 nextToken = response.nextToken;
             } catch (error) {
                 this.handleAuthError(error);
@@ -131,19 +166,21 @@ class CloudWatchClient {
 
         if (discovered.length === 0) {
             this.logger.warn('Nessun log group trovato per il prefix CloudWatch', {
-                prefix
+                prefix,
+                ignoredCount
             });
         } else {
             this.logger.info('Log group CloudWatch risolti da prefix', {
                 prefix,
-                count: discovered.length
+                count: discovered.length,
+                ignoredCount
             });
         }
 
         return discovered;
     }
 
-    async resolveConfiguredLogGroups() {
+    async resolveConfiguredLogGroups(options = {}) {
         const resolved = [];
         const seen = new Set();
 
@@ -154,7 +191,10 @@ class CloudWatchClient {
             }
 
             if (entry.type === 'prefix') {
-                const discovered = await this.discoverLogGroupsByPrefix(entry.prefix);
+                const discovered = await this.discoverLogGroupsByPrefix(
+                    entry.prefix,
+                    options
+                );
                 for (const logGroupName of discovered) {
                     this.addUniqueLogGroup(resolved, seen, logGroupName);
                 }
@@ -162,10 +202,46 @@ class CloudWatchClient {
         }
 
         if (resolved.length === 0) {
-            throw new Error('Nessun log group CloudWatch risolto dalla configurazione');
+            if (options.failIfEmpty === false) {
+                this.logger.warn('Nessun log group CloudWatch attivo dopo la discovery');
+            } else {
+                throw new Error('Nessun log group CloudWatch risolto dalla configurazione');
+            }
         }
 
         this.logGroups = resolved;
+        return resolved;
+    }
+
+    hasPrefixLogGroups() {
+        return this.logGroupEntries.some(entry => entry.type === 'prefix');
+    }
+
+    async refreshConfiguredLogGroups(options = {}) {
+        if (!this.hasPrefixLogGroups()) {
+            return [...this.logGroups];
+        }
+
+        if (this.refreshInProgress) {
+            this.logger.warn('Discovery prefix CloudWatch gia in corso');
+            return [...this.logGroups];
+        }
+
+        this.refreshInProgress = true;
+        try {
+            const previousCount = this.logGroups.length;
+            const resolved = await this.resolveConfiguredLogGroups({
+                now: options.now,
+                failIfEmpty: false
+            });
+            this.logger.info('Discovery prefix CloudWatch aggiornata', {
+                previousCount,
+                currentCount: resolved.length
+            });
+            return resolved;
+        } finally {
+            this.refreshInProgress = false;
+        }
     }
 
     ensureInitialized() {

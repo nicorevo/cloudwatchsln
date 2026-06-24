@@ -224,6 +224,46 @@ test('normalizeConfig applica default schedule files e logging mancanti', () => 
     assert.deepEqual(entry.exceptionPatterns, []);
     assert.deepEqual(entry.excludeExceptionPatterns, []);
     assert.deepEqual(entry.channels, []);
+    assert.deepEqual(entry.logGroupDiscovery, {
+        activeWindowHours: 4,
+        refreshIntervalMinutes: 10
+    });
+});
+
+test('normalizeConfig normalizza override logGroupDiscovery per progetto', () => {
+    const normalized = normalizeConfig({
+        aws: BASE_AWS,
+        cloudwatch: [multiProjectEntry('prj01', {
+            logGroupDiscovery: {
+                activeWindowHours: 2,
+                refreshIntervalMinutes: 0
+            }
+        })]
+    });
+
+    assert.deepEqual(normalized.cloudwatch[0].logGroupDiscovery, {
+        activeWindowHours: 2,
+        refreshIntervalMinutes: 0
+    });
+});
+
+test('normalizeConfig rifiuta logGroupDiscovery non valido', () => {
+    for (const logGroupDiscovery of [
+        { activeWindowHours: 0 },
+        { activeWindowHours: -1 },
+        { activeWindowHours: '4' },
+        { refreshIntervalMinutes: -1 },
+        { refreshIntervalMinutes: 2.5 },
+        { refreshIntervalMinutes: '10' }
+    ]) {
+        assert.throws(
+            () => normalizeConfig({
+                aws: BASE_AWS,
+                cloudwatch: [multiProjectEntry('prj01', { logGroupDiscovery })]
+            }),
+            /logGroupDiscovery non valido per progetto prj01/
+        );
+    }
 });
 
 test('normalizeConfig normalizza channel Slack senza materializzare il webhook', () => {

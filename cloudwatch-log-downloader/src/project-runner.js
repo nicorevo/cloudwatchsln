@@ -15,6 +15,7 @@ function buildSyntheticProjectConfig(rootConfig, entry) {
         project: entry.project,
         cloudwatch: {
             logGroups: entry.logGroups,
+            logGroupDiscovery: entry.logGroupDiscovery,
             filterPattern: entry.filterPattern,
             maxResults: entry.maxResults,
             monitorPatterns: entry.monitorPatterns,
@@ -138,6 +139,21 @@ class ProjectRunner {
                 project: this.project,
                 message: error.message,
                 stack: error.stack
+            });
+        }
+    }
+
+    async refreshLogGroupDiscovery() {
+        if (typeof this.cloudWatchClient.refreshConfiguredLogGroups !== 'function') {
+            return;
+        }
+
+        try {
+            await this.cloudWatchClient.refreshConfiguredLogGroups();
+        } catch (error) {
+            this.logger.error('Errore durante la discovery dei log group CloudWatch', {
+                project: this.project,
+                message: error.message
             });
         }
     }
