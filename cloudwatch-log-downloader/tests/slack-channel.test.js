@@ -63,7 +63,7 @@ test('formatSlackMessage include intestazione e righe compatte UTC', () => {
     assert.match(text, /10:15:09 request started/);
     assert.match(
         text,
-        /10:15:10 \[ECCEZIONE\] ERROR ''' &lt;!channel&gt; &amp; failure ↵ second line/
+        /\*10:15:10 \[ECCEZIONE\] ERROR ''' &lt;!channel&gt; &amp; failure ↵ second line\*/
     );
     assert.match(text, /10:15:11 retry planned/);
     assert.doesNotMatch(text, /Contesto:|\[prima\]|\[dopo\]|rotating_light/);
@@ -192,7 +192,7 @@ test('SlackChannel considera successo soltanto HTTP 200 con body ok', async () =
     assert.deepEqual(result, { status: 'sent', attempts: 1 });
     assert.equal(calls[0].payload.unfurl_links, false);
     assert.equal(calls[0].payload.unfurl_media, false);
-    assert.equal(calls[0].payload.mrkdwn, false);
+    assert.equal(calls[0].payload.mrkdwn, true);
     assert.doesNotMatch(JSON.stringify(logger.calls), /hooks\.slack\.com/);
 });
 

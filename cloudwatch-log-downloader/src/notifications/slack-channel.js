@@ -26,7 +26,8 @@ function formatUtcTime(timestamp) {
 
 function formatEventLine(event, isException = false) {
     const marker = isException ? '[ECCEZIONE] ' : '';
-    return `${formatUtcTime(event.timestamp)} ${marker}${sanitizeSlackText(event.message)}`;
+    const line = `${formatUtcTime(event.timestamp)} ${marker}${sanitizeSlackText(event.message)}`;
+    return isException ? `*${line}*` : line;
 }
 
 function buildSlackText(notification, before, after, includeOmittedCount = true) {
@@ -171,7 +172,7 @@ class SlackChannel {
 
         const payload = {
             text,
-            mrkdwn: false,
+            mrkdwn: true,
             unfurl_links: false,
             unfurl_media: false
         };
