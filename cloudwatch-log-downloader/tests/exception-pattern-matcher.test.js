@@ -34,6 +34,21 @@ test('matching è case-sensitive e basato su sottostringa', () => {
     assert.equal(isExceptionMessage('prefix ERROR suffix', ['ERROR'], []), true);
 });
 
+test('pattern generico error non matcha parole italiane come errore', () => {
+    assert.equal(
+        isExceptionMessage(
+            'INFO Messaggio mail: e presente un errore nella definizione',
+            ['error'],
+            []
+        ),
+        false
+    );
+    assert.equal(isExceptionMessage('INFO ERRORE nel corpo mail', ['ERROR'], []), false);
+    assert.equal(isExceptionMessage('worker error: timeout', ['error'], []), true);
+    assert.equal(isExceptionMessage('worker ERROR: timeout', ['ERROR'], []), true);
+    assert.equal(isExceptionMessage('[error] timeout', ['error'], []), true);
+});
+
 test('pattern vuoti e non stringa sono ignorati senza mutare input', () => {
     const patterns = ['', null, 42, 'ERROR'];
     const normalized = normalizePatterns(patterns);

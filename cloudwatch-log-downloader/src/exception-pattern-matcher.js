@@ -8,6 +8,14 @@ function normalizePatterns(patterns) {
     );
 }
 
+function matchesPattern(text, pattern) {
+    if (pattern.toLowerCase() === 'error') {
+        return new RegExp(`(^|[^A-Za-z])${pattern}($|[^A-Za-z])`).test(text);
+    }
+
+    return text.includes(pattern);
+}
+
 function createExceptionMatcher(
     exceptionPatterns,
     excludeExceptionPatterns = [],
@@ -23,13 +31,13 @@ function createExceptionMatcher(
     return message => {
         const text = message ?? '';
         const matchesException = includes
-            .some(pattern => text.includes(pattern));
+            .some(pattern => matchesPattern(text, pattern));
 
         if (!matchesException) {
             return false;
         }
 
-        return !excludes.some(pattern => text.includes(pattern));
+        return !excludes.some(pattern => matchesPattern(text, pattern));
     };
 }
 
