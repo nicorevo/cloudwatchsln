@@ -210,7 +210,12 @@ class CloudWatchLogDownloader {
 
             const discoveryJob = hasPrefixDiscovery && discoveryIntervalMinutes > 0
                 ? this.cron.schedule(`*/${discoveryIntervalMinutes} * * * *`, async () => {
-                    await runner.refreshLogGroupDiscovery();
+                    const resolvedLogGroups = await runner.refreshLogGroupDiscovery();
+                    if (Array.isArray(resolvedLogGroups)) {
+                        this.monitorServer?.updateProjectLogGroups?.(runner.project, {
+                            resolvedLogGroups
+                        });
+                    }
                 }, {
                     scheduled: true,
                     timezone: 'Europe/Rome'

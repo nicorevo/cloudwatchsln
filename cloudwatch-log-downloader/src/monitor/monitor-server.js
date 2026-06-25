@@ -74,6 +74,23 @@ class MonitorServer {
         return this.projects.get(projectId) || null;
     }
 
+    updateProjectLogGroups(projectId, metadata = {}) {
+        const project = this.resolveProject(projectId);
+        if (!project) {
+            return false;
+        }
+
+        if (Array.isArray(metadata.configuredLogGroups)) {
+            project.configuredLogGroups = [...metadata.configuredLogGroups];
+        }
+
+        if (Array.isArray(metadata.resolvedLogGroups)) {
+            project.resolvedLogGroups = [...metadata.resolvedLogGroups];
+        }
+
+        return true;
+    }
+
     async start() {
         if (!this.config.enabled) {
             return;

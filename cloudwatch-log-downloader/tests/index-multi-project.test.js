@@ -239,6 +239,67 @@ test('startScheduledJobs schedula refresh discovery per progetti con prefix', ()
     assert.deepEqual(refreshCalls, ['with-prefix']);
 });
 
+test('startScheduledJobs aggiorna il monitor dopo refresh discovery prefix', async () => {
+    const fakeCron = {
+        schedule(interval, handler) {
+            return {
+                interval,
+                handler,
+                stop() {}
+            };
+        }
+    };
+    const downloader = new CloudWatchLogDownloader({
+        configPath: MULTI_CONFIG,
+        cron: fakeCron
+    });
+    const monitorUpdates = [];
+    downloader.logger = { info() {}, warn() {}, error() {} };
+    downloader.config = {
+        aws: { credentialRefreshIntervalMinutes: 55 },
+        cloudwatch: [],
+        monitor: { enabled: true }
+    };
+    downloader.monitorServer = {
+        updateProjectLogGroups(project, metadata) {
+            monitorUpdates.push({ project, metadata });
+        }
+    };
+    downloader.startCredentialRefreshJob = () => {};
+    downloader.registerShutdownHandlers = () => {};
+    downloader.projectRunners = [{
+        project: 'with-prefix',
+        config: {
+            schedule: {
+                downloadInterval: '*/1 * * * *',
+                cleanupInterval: '*/60 * * * *'
+            },
+            cloudwatch: {
+                logGroups: [{ type: 'prefix', prefix: '/eks/ns/job-' }],
+                logGroupDiscovery: {
+                    activeWindowHours: 4,
+                    refreshIntervalMinutes: 10
+                }
+            }
+        },
+        async downloadLogs() {},
+        async cleanupOldFiles() {},
+        async refreshLogGroupDiscovery() {
+            return ['/eks/ns/job-001', '/eks/ns/job-002'];
+        }
+    }];
+
+    downloader.startScheduledJobs();
+    await downloader.scheduledJobs[0].discoveryJob.handler();
+
+    assert.deepEqual(monitorUpdates, [{
+        project: 'with-prefix',
+        metadata: {
+            resolvedLogGroups: ['/eks/ns/job-001', '/eks/ns/job-002']
+        }
+    }]);
+});
+
 test('registerShutdownHandlers registra listener una sola volta', () => {
     const downloader = new CloudWatchLogDownloader({ configPath: MULTI_CONFIG });
     downloader.logger = { info() {}, error() {} };

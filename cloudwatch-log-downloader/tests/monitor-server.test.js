@@ -98,6 +98,33 @@ test('monitor server espone lista progetti', async () => {
     }
 });
 
+test('monitor server aggiorna i log group risolti di un progetto', async () => {
+    const server = new MonitorServer(MONITOR_CONFIG, logger, singleProject());
+    await server.start();
+    const baseUrl = `http://127.0.0.1:${server.server.address().port}`;
+
+    try {
+        server.updateProjectLogGroups('my-app', {
+            resolvedLogGroups: [
+                '/eks/ns/generated-worker-003',
+                '/eks/ns/generated-worker-004'
+            ]
+        });
+
+        const projects = await requestJson(`${baseUrl}/api/v1/projects`);
+        assert.deepEqual(projects.projects[0].resolvedLogGroups, [
+            '/eks/ns/generated-worker-003',
+            '/eks/ns/generated-worker-004'
+        ]);
+        assert.deepEqual(projects.projects[0].configuredLogGroups, [
+            { type: 'complete', value: '/eks/ns/static-worker-prod' },
+            { type: 'prefix', value: '/eks/ns/generated-worker-' }
+        ]);
+    } finally {
+        await server.stop();
+    }
+});
+
 test('monitor server espone initial e incremental tail per progetto', async () => {
     const logDirectory = await fs.mkdtemp(path.join(os.tmpdir(), 'monitor-tail-'));
     const filename = 'tail-service_2026-06-23_10-00.log';

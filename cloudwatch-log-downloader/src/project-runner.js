@@ -145,16 +145,17 @@ class ProjectRunner {
 
     async refreshLogGroupDiscovery() {
         if (typeof this.cloudWatchClient.refreshConfiguredLogGroups !== 'function') {
-            return;
+            return null;
         }
 
         try {
-            await this.cloudWatchClient.refreshConfiguredLogGroups();
+            return await this.cloudWatchClient.refreshConfiguredLogGroups();
         } catch (error) {
             this.logger.error('Errore durante la discovery dei log group CloudWatch', {
                 project: this.project,
                 message: error.message
             });
+            return null;
         }
     }
 

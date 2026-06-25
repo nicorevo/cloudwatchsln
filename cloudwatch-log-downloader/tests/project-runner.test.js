@@ -99,9 +99,10 @@ test('ProjectRunner refreshLogGroupDiscovery delega a CloudWatchClient', async (
         }
     });
 
-    await runner.refreshLogGroupDiscovery();
+    const resolved = await runner.refreshLogGroupDiscovery();
 
     assert.equal(refreshed, true);
+    assert.deepEqual(resolved, ['/eks/ns/worker-prod']);
 });
 
 test('ProjectRunner refreshLogGroupDiscovery non propaga errori CloudWatch', async () => {
