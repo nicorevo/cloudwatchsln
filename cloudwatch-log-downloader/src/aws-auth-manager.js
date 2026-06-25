@@ -2,7 +2,7 @@ const fs = require('fs-extra');
 const path = require('path');
 const os = require('os');
 const { spawn } = require('child_process');
-const { fromSSO, fromIni } = require('@aws-sdk/credential-providers');
+const { fromNodeProviderChain, fromSSO, fromIni } = require('@aws-sdk/credential-providers');
 const { STSClient, GetCallerIdentityCommand } = require('@aws-sdk/client-sts');
 
 function isTokenError(error) {
@@ -167,7 +167,7 @@ class AwsAuthManager {
 
     createDefaultCredentialProvider() {
         if (!this.profile) {
-            return null;
+            return fromNodeProviderChain();
         }
 
         try {
@@ -206,15 +206,11 @@ class AwsAuthManager {
         }
 
         this.credentialProvider = this.createCredentialProviderFn();
-        if (!this.credentialProvider) {
-            throw new Error('AWS profile not configured');
-        }
-
         try {
             this.lastCredentials = await this.credentialProvider();
             this.lastIdentity = await this.verifyIdentityFn(this.lastCredentials);
         } catch (error) {
-            if (isTokenError(error)) {
+            if (this.profile && isTokenError(error)) {
                 throw buildSsoExpiredError(this.profile);
             }
 
@@ -277,7 +273,7 @@ class AwsAuthManager {
         } catch (error) {
             this.authenticated = false;
 
-            if (isTokenError(error)) {
+            if (this.profile && isTokenError(error)) {
                 throw buildSsoExpiredError(this.profile);
             }
 

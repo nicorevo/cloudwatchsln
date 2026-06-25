@@ -115,7 +115,7 @@ test('applica gli exclude al body log estratto dal payload JSON', async () => {
         );
         const main = await fs.readFile(path.join(logDirectory, mainFile), 'utf8');
 
-        assert.match(main, /\[\/eks\/example \| api\] ERROR Known harmless error/);
+        assert.match(main, /\[logGroup=\/eks\/example\] \[container=api\] ERROR Known harmless error/);
         assert.equal(
             files.some(filename => filename.startsWith('sample-service-exceptions_')),
             false

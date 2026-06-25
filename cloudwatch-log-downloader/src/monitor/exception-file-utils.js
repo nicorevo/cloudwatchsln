@@ -107,9 +107,9 @@ function parseExceptionId(id) {
 
 function parseLogLine(line) {
     const trimmed = (line || '').trim();
-    const match = trimmed.match(/^\[([^\]]+)\]\s+\[([^\]]+)\]\s+(.*)$/);
+    const timestampMatch = trimmed.match(/^\[([^\]]+)\]\s+(.*)$/);
 
-    if (!match) {
+    if (!timestampMatch) {
         return {
             timestamp: null,
             source: null,
@@ -118,10 +118,20 @@ function parseLogLine(line) {
         };
     }
 
-    const body = match[3];
+    let rest = timestampMatch[2];
+    const sourceParts = [];
+    let sourceMatch = rest.match(/^\[([^\]]+)\]\s*(.*)$/);
+
+    while (sourceMatch) {
+        sourceParts.push(sourceMatch[1]);
+        rest = sourceMatch[2];
+        sourceMatch = rest.match(/^\[([^\]]+)\]\s*(.*)$/);
+    }
+
+    const body = rest.trim();
     return {
-        timestamp: match[1],
-        source: match[2],
+        timestamp: timestampMatch[1],
+        source: sourceParts.length > 0 ? sourceParts.join(' ') : null,
         body,
         preview: buildPreview(body, PREVIEW_MAX_LENGTH)
     };

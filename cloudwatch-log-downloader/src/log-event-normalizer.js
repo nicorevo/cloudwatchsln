@@ -27,11 +27,13 @@ function normalizeLogEvent(event = {}) {
 
 function formatNormalizedLogLine(event) {
     const timestamp = new Date(event.timestamp).toISOString();
-    const source = event.containerName
-        ? `${event.logGroupName} | ${event.containerName}`
-        : event.logGroupName;
+    const sourceParts = [`[logGroup=${event.logGroupName}]`];
 
-    return `[${timestamp}] [${source}] ${event.body}`;
+    if (event.containerName) {
+        sourceParts.push(`[container=${event.containerName}]`);
+    }
+
+    return `[${timestamp}] ${sourceParts.join(' ')} ${event.body}`;
 }
 
 module.exports = {

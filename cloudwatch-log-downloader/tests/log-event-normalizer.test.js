@@ -30,7 +30,7 @@ test('normalizeLogEvent estrae body e container dai payload JSON Kubernetes', ()
     });
     assert.equal(
         formatNormalizedLogLine(normalized),
-        '[2026-06-23T08:00:00.000Z] [/eks/example | api] ERROR database unavailable'
+        '[2026-06-23T08:00:00.000Z] [logGroup=/eks/example] [container=api] ERROR database unavailable'
     );
 });
 
@@ -45,6 +45,6 @@ test('normalizeLogEvent conserva messaggi testuali e fallback di sorgente', () =
     assert.equal(normalized.logStreamName, 'unknown');
     assert.equal(
         formatNormalizedLogLine(normalized),
-        '[2026-06-23T08:00:00.000Z] [unknown] plain message'
+        '[2026-06-23T08:00:00.000Z] [logGroup=unknown] plain message'
     );
 });

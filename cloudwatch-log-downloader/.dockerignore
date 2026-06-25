@@ -1,0 +1,15 @@
+node_modules
+npm-debug.log*
+logs
+*.log
+
+config.uat.json
+config.prod.json
+config.json
+
+.aws
+.env
+.env.*
+
+coverage
+.nyc_output

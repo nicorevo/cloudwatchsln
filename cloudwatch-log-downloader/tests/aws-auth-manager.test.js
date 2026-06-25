@@ -83,6 +83,17 @@ test('authenticate resolves credentials and identity', async () => {
     assert.equal(authManager.isAuthenticated(), true);
 });
 
+test('createDefaultCredentialProvider supports AWS default chain without profile', () => {
+    const authManager = new AwsAuthManager({
+        region: 'eu-central-1',
+        credentialRefreshIntervalMinutes: 55,
+        loginOnStartupIfNeeded: false,
+        ssoSessionWarningMinutes: 30
+    }, logger);
+
+    assert.equal(typeof authManager.createDefaultCredentialProvider(), 'function');
+});
+
 test('authenticate throws actionable error when SSO token expired', async () => {
     const authManager = new AwsAuthManager(awsConfig, logger, {
         createCredentialProvider: () => async () => {

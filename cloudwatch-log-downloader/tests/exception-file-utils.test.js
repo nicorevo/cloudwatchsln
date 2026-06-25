@@ -78,6 +78,16 @@ test('parseLogLine extracts timestamp source and preview', () => {
     assert.equal(parsed.preview, 'ERROR something failed');
 });
 
+test('parseLogLine extracts explicit log group and container source blocks', () => {
+    const line = '[2026-06-19T09:00:05.000Z] [logGroup=/eks/test] [container=worker] ERROR something failed';
+    const parsed = parseLogLine(line);
+
+    assert.equal(parsed.timestamp, '2026-06-19T09:00:05.000Z');
+    assert.equal(parsed.source, 'logGroup=/eks/test container=worker');
+    assert.equal(parsed.body, 'ERROR something failed');
+    assert.equal(parsed.preview, 'ERROR something failed');
+});
+
 test('isValidFileId rejects path traversal segments', () => {
     assert.equal(isValidFileId('2026-06-19_11-49'), true);
     assert.equal(isValidFileId('fixture'), true);
