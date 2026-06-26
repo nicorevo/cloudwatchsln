@@ -63,11 +63,19 @@ Essential fields:
   "environment": "prod",
   "aws": {
     "region": "eu-west-1",
-    "profile": "my-aws-sso-profile"
+    "profile": "my-aws-sso-profile",
+    "credentialRefreshIntervalMinutes": 55,
+    "loginOnStartupIfNeeded": false,
+    "ssoSessionWarningMinutes": 30
   },
   "monitor": {
     "enabled": true,
-    "port": 3847
+    "host": "127.0.0.1",
+    "port": 3847,
+    "contextLinesBefore": 10,
+    "contextLinesAfter": 10,
+    "treeRefreshSeconds": 30,
+    "maxExceptionFiles": 50
   },
   "cloudwatch": [
     {
@@ -159,8 +167,11 @@ Other useful fields in `config.sample.json`:
 | Section | Field | Default | Description |
 |---------|-------|---------|-------------|
 | `aws` | `credentialRefreshIntervalMinutes` | `55` | Proactive STS credential refresh |
-| `aws` | `loginOnStartupIfNeeded` | `false` | Opens SSO browser if session is missing |
-| `cloudwatch[]` | `monitorPatterns` | `[]` | Empty = all lines in the main file |
+| `aws` | `loginOnStartupIfNeeded` | `false` | Opens the SSO browser if the local SSO session is missing |
+| `aws` | `ssoSessionWarningMinutes` | `30` | Warn before the portal SSO session expires |
+| `cloudwatch[]` | `filterPattern` | `""` | CloudWatch filter pattern applied at the AWS query level |
+| `cloudwatch[]` | `maxResults` | `100000` | Maximum events to fetch per CloudWatch query |
+| `cloudwatch[]` | `monitorPatterns` | `[]` | If set, only lines containing one of these substrings are written to the main log and considered for notifications |
 | `cloudwatch[]` | `excludeExceptionPatterns` | `[]` | Excludes false positives matched by `exceptionPatterns` |
 | `cloudwatch[]` | `channels` | `[]` | Notification destinations; enabled Slack channels require their webhook environment variable |
 | `cloudwatch[]` | `logGroupDiscovery.activeWindowHours` | `4` | Prefix groups must have a latest stream event within this many hours |
@@ -169,7 +180,13 @@ Other useful fields in `config.sample.json`:
 | `cloudwatch[]` | `schedule.downloadInterval` | `*/1 * * * *` | Download cron per project (Europe/Rome) |
 | `cloudwatch[]` | `files.preserveExceptionPairs` | `true` | Do not delete exception/main pairs |
 | `cloudwatch[]` | `logging.level` | `info` | Service log level uses the **first** entry's `logging.level` |
+| `monitor` | `enabled` | `true` | Enable the exception monitor UI and JSON REST API |
+| `monitor` | `host` | `127.0.0.1` | Bind address for the monitor server |
 | `monitor` | `port` | `3847` | Exception Monitor port |
+| `monitor` | `contextLinesBefore` | `10` | Lines shown before exception in context view |
+| `monitor` | `contextLinesAfter` | `10` | Lines shown after exception in context view |
+| `monitor` | `treeRefreshSeconds` | `30` | How often the dashboard refreshes tree data |
+| `monitor` | `maxExceptionFiles` | `50` | Maximum exception files shown per project in the monitor |
 
 Discover EKS log groups:
 
@@ -184,6 +201,8 @@ aws sso login --profile my-aws-sso-profile
 npm run check-sso-expiry:prod    # optional: SSO session expiry
 npm run start:prod
 ```
+
+If `aws.loginOnStartupIfNeeded` is enabled, the service may automatically run `aws sso login --profile ...` when the local SSO session is missing. Otherwise, make sure the AWS SSO session is active before starting.
 
 Expected output:
 
