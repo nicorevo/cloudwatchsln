@@ -165,6 +165,12 @@ test('ProjectRunner downloadLogs scrive eventi e aggiorna lastProcessedTime', as
 test('ProjectRunner passa gli eventi al notification manager dopo la scrittura', async () => {
     const order = [];
     const events = [{ timestamp: Date.now(), message: 'ERROR event-1' }];
+    const writeSummary = {
+        logFileName: 'prj01_2026-06-26_11-10.log',
+        exceptionFileName: 'prj01-exceptions_2026-06-26_11-10.log',
+        writtenLineCount: 1,
+        exceptionLineCount: 1
+    };
     const runner = new ProjectRunner(ROOT_CONFIG, PROJECT_ENTRY, {}, createLogger(), {
         cloudWatchClient: {
             async fetchLogsPaginated() {
@@ -174,12 +180,14 @@ test('ProjectRunner passa gli eventi al notification manager dopo la scrittura',
         fileManager: {
             async writeLogsToFile() {
                 order.push('file');
+                return writeSummary;
             }
         },
         notificationManager: {
             async init() {},
-            ingest(received) {
+            ingest(received, receivedSummary) {
                 assert.equal(received, events);
+                assert.equal(receivedSummary, writeSummary);
                 order.push('notification');
             },
             async close() {}

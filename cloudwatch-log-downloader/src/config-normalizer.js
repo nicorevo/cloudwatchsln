@@ -32,6 +32,11 @@ const DEFAULT_LOG_GROUP_DISCOVERY = {
     eventualConsistencyGraceMinutes: 90
 };
 
+const DEFAULT_CHANNEL_GROUPING = {
+    mode: 'single',
+    flushDelaySeconds: 70
+};
+
 function isLegacyCloudwatchConfig(config) {
     return config.cloudwatch
         && typeof config.cloudwatch === 'object'
@@ -202,6 +207,33 @@ function validateSlackWebhook(channel, project, env) {
     }
 }
 
+function normalizeChannelGrouping(grouping = {}, channelId, project) {
+    if (grouping === undefined) {
+        return { ...DEFAULT_CHANNEL_GROUPING };
+    }
+
+    if (grouping === null || typeof grouping !== 'object' || Array.isArray(grouping)) {
+        throw new Error(`grouping non valido per channel ${channelId} del progetto ${project}`);
+    }
+
+    const mode = grouping.mode ?? DEFAULT_CHANNEL_GROUPING.mode;
+    const flushDelaySeconds = grouping.flushDelaySeconds
+        ?? DEFAULT_CHANNEL_GROUPING.flushDelaySeconds;
+
+    if (
+        !['single', 'exception-file'].includes(mode)
+        || !Number.isInteger(flushDelaySeconds)
+        || flushDelaySeconds <= 0
+    ) {
+        throw new Error(`grouping non valido per channel ${channelId} del progetto ${project}`);
+    }
+
+    return {
+        mode,
+        flushDelaySeconds
+    };
+}
+
 function normalizeChannels(channels, project, env = process.env) {
     if (channels === undefined) {
         return [];
@@ -237,7 +269,8 @@ function normalizeChannels(channels, project, env = process.env) {
             id,
             type: channel.type,
             enabled: channel.enabled !== false,
-            webhookUrlEnv: channel.webhookUrlEnv
+            webhookUrlEnv: channel.webhookUrlEnv,
+            grouping: normalizeChannelGrouping(channel.grouping, id, project)
         };
         validateSlackWebhook(normalized, project, env);
         return normalized;

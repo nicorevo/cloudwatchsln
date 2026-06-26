@@ -132,12 +132,19 @@ class FileManager {
     async writeLogsToFile(events) {
         if (!events || events.length === 0) {
             this.logger.debug('No log events to write');
-            return;
+            return {
+                logFileName: null,
+                exceptionFileName: null,
+                writtenLineCount: 0,
+                exceptionLineCount: 0
+            };
         }
 
         try {
             const filePath = this.getCurrentLogFilePath();
             const exceptionFilePath = this.getExceptionLogFilePath();
+            const logFileName = path.basename(filePath);
+            const exceptionFileName = path.basename(exceptionFilePath);
             const lines = [];
             const exceptionLines = [];
 
@@ -159,16 +166,28 @@ class FileManager {
 
             if (lines.length === 0) {
                 this.logger.debug('No lines after monitorPatterns filter');
-                return;
+                return {
+                    logFileName,
+                    exceptionFileName: null,
+                    writtenLineCount: 0,
+                    exceptionLineCount: 0
+                };
             }
 
             await fs.appendFile(filePath, lines.join('\n') + '\n');
-            this.logger.info(`Wrote ${lines.length} logs to file: ${path.basename(filePath)}`);
+            this.logger.info(`Wrote ${lines.length} logs to file: ${logFileName}`);
 
             if (exceptionLines.length > 0) {
                 await fs.appendFile(exceptionFilePath, exceptionLines.join('\n') + '\n');
-                this.logger.info(`Wrote ${exceptionLines.length} exceptions to: ${path.basename(exceptionFilePath)}`);
+                this.logger.info(`Wrote ${exceptionLines.length} exceptions to: ${exceptionFileName}`);
             }
+
+            return {
+                logFileName,
+                exceptionFileName: exceptionLines.length > 0 ? exceptionFileName : null,
+                writtenLineCount: lines.length,
+                exceptionLineCount: exceptionLines.length
+            };
 
         } catch (error) {
             this.logger.error('Error writing log file:', {

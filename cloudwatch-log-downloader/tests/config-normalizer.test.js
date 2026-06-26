@@ -293,9 +293,40 @@ test('normalizeConfig normalizza channel Slack senza materializzare il webhook',
         id: 'operations-slack',
         type: 'slack',
         enabled: true,
-        webhookUrlEnv: envName
+        webhookUrlEnv: envName,
+        grouping: {
+            mode: 'single',
+            flushDelaySeconds: 70
+        }
     }]);
     assert.doesNotMatch(JSON.stringify(normalized), /T000|TEST_TOKEN/);
+});
+
+test('normalizeConfig normalizza grouping Slack per channel', () => {
+    const envName = 'TEST_SLACK_WEBHOOK_URL';
+    const normalized = normalizeConfig({
+        aws: BASE_AWS,
+        cloudwatch: [multiProjectEntry('prj01', {
+            channels: [{
+                id: 'operations-slack',
+                type: 'slack',
+                webhookUrlEnv: envName,
+                grouping: {
+                    mode: 'exception-file',
+                    flushDelaySeconds: 120
+                }
+            }]
+        })]
+    }, {
+        env: {
+            [envName]: 'https://hooks.slack.com/services/T000/B000/TEST_TOKEN'
+        }
+    });
+
+    assert.deepEqual(normalized.cloudwatch[0].channels[0].grouping, {
+        mode: 'exception-file',
+        flushDelaySeconds: 120
+    });
 });
 
 test('normalizeConfig accetta channel disabilitato senza variabile ambiente', () => {
@@ -338,6 +369,22 @@ test('normalizeConfig rifiuta configurazioni channel non valide', () => {
         {
             channels: [{ id: 'slack', type: 'slack', enabled: 'yes', webhookUrlEnv: 'X' }],
             pattern: /enabled deve essere boolean/
+        },
+        {
+            channels: [{ id: 'slack', type: 'slack', enabled: false, webhookUrlEnv: 'X', grouping: null }],
+            pattern: /grouping non valido/
+        },
+        {
+            channels: [{ id: 'slack', type: 'slack', enabled: false, webhookUrlEnv: 'X', grouping: { mode: 'daily' } }],
+            pattern: /grouping non valido/
+        },
+        {
+            channels: [{ id: 'slack', type: 'slack', enabled: false, webhookUrlEnv: 'X', grouping: { flushDelaySeconds: 0 } }],
+            pattern: /grouping non valido/
+        },
+        {
+            channels: [{ id: 'slack', type: 'slack', enabled: false, webhookUrlEnv: 'X', grouping: { flushDelaySeconds: 2.5 } }],
+            pattern: /grouping non valido/
         },
         {
             channels: [{ id: 'slack', type: 'slack', webhookUrlEnv: 'not-valid-env' }],

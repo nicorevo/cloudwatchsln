@@ -264,13 +264,17 @@ Then enable the project channel:
       "id": "operations-slack",
       "type": "slack",
       "enabled": true,
-      "webhookUrlEnv": "MY_APPLICATION_SLACK_WEBHOOK_URL"
+      "webhookUrlEnv": "MY_APPLICATION_SLACK_WEBHOOK_URL",
+      "grouping": {
+        "mode": "single",
+        "flushDelaySeconds": 70
+      }
     }
   ]
 }
 ```
 
-Every detected exception produces a separate message containing project,
+By default, every detected exception produces a separate message containing project,
 environment, timestamp, log group and log stream. It then shows up to 5
 preceding lines, the complete exception emphasized in Slack markdown as
 `:rotating_light: [ECCEZIONE]`, and up to 5 following lines from the same
@@ -282,6 +286,22 @@ The exception is never truncated. If the message exceeds Slack's configured
 limit, complete context lines are removed starting with those furthest from
 the exception. If the header and complete exception alone do not fit, delivery
 fails locally without calling Slack.
+
+To reduce noise, enable per-channel grouping by local exception file:
+
+```json
+{
+  "grouping": {
+    "mode": "exception-file",
+    "flushDelaySeconds": 70
+  }
+}
+```
+
+With `exception-file`, Slack receives one digest per project/channel/exception
+file, such as `3 eccezioni rilevate sul progetto my-application`, plus
+environment, file name, and detection timestamp. The digest does not include
+exception text or context lines.
 
 Delivery failures never stop log downloads. Slack retries transient failures
 up to three times, while persistent deduplication prevents normal process

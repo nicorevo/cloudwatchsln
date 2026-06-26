@@ -67,6 +67,7 @@ class ExceptionNotificationManager {
         this.clearTimer = options.clearTimeout ?? clearTimeout;
         this.buffers = new Map();
         this.pending = new Set();
+        this.digestGroups = new Map();
         this.deliveries = new Set();
         this.recentEvents = new Map();
         this.accepting = true;
@@ -102,6 +103,23 @@ class ExceptionNotificationManager {
         ]);
     }
 
+    digestGroupKey(channelId, exceptionFileName) {
+        return stableHash([
+            this.project,
+            channelId,
+            exceptionFileName
+        ]);
+    }
+
+    digestNotificationId(channelId, exceptionFileName, keys) {
+        return stableHash([
+            this.project,
+            channelId,
+            exceptionFileName,
+            ...keys
+        ]);
+    }
+
     recentEventKey(event) {
         return stableHash([
             event.logGroupName,
@@ -126,7 +144,7 @@ class ExceptionNotificationManager {
         return false;
     }
 
-    ingest(events) {
+    ingest(events, writeSummary = {}) {
         if (!this.accepting || this.channels.length === 0 || !Array.isArray(events)) {
             return;
         }
@@ -158,7 +176,7 @@ class ExceptionNotificationManager {
 
             const buffer = this.buffers.get(streamKey) || [];
             if (this.isException(event.body)) {
-                this.openPending(event, streamKey, buffer);
+                this.handleExceptionEvent(event, streamKey, buffer, writeSummary);
             }
 
             buffer.push(contextEvent);
@@ -169,14 +187,57 @@ class ExceptionNotificationManager {
         }
     }
 
-    openPending(event, streamKey, buffer) {
-        const targets = [];
+    handleExceptionEvent(event, streamKey, buffer, writeSummary = {}) {
+        const singleTargets = [];
         for (const channel of this.channels) {
+            const grouping = channel.grouping || { mode: 'single' };
+            if (
+                grouping.mode === 'exception-file'
+                && writeSummary?.exceptionFileName
+            ) {
+                this.addToDigestGroup(event, channel, writeSummary.exceptionFileName);
+                continue;
+            }
+
             const key = this.channelNotificationKey(event, channel.id);
             if (this.stateStore.reserve(key)) {
-                targets.push({ channel, key });
+                singleTargets.push({ channel, key });
             }
         }
+
+        if (singleTargets.length > 0) {
+            this.openPending(event, streamKey, buffer, singleTargets);
+        }
+    }
+
+    addToDigestGroup(event, channel, exceptionFileName) {
+        const key = this.channelNotificationKey(event, channel.id);
+        if (!this.stateStore.reserve(key)) {
+            return;
+        }
+
+        const groupKey = this.digestGroupKey(channel.id, exceptionFileName);
+        let group = this.digestGroups.get(groupKey);
+        if (!group) {
+            group = {
+                channel,
+                exceptionFileName,
+                entries: [],
+                timer: null,
+                finalized: false
+            };
+            const flushDelaySeconds = channel.grouping?.flushDelaySeconds ?? 70;
+            group.timer = this.setTimer(
+                () => this.flushDigestGroup(group),
+                flushDelaySeconds * 1000
+            );
+            this.digestGroups.set(groupKey, group);
+        }
+
+        group.entries.push({ event, key });
+    }
+
+    openPending(event, streamKey, buffer, targets) {
         if (targets.length === 0) {
             return;
         }
@@ -195,6 +256,65 @@ class ExceptionNotificationManager {
             CONTEXT_TIMEOUT_MS
         );
         this.pending.add(pending);
+    }
+
+    buildDigestNotification(group) {
+        const keys = group.entries.map(entry => entry.key).sort();
+
+        return {
+            type: 'exception-file-digest',
+            notificationId: this.digestNotificationId(
+                group.channel.id,
+                group.exceptionFileName,
+                keys
+            ),
+            project: this.project,
+            environment: this.environment,
+            detectedAt: new Date(this.now()).toISOString(),
+            exceptionFileName: group.exceptionFileName,
+            exceptionCount: group.entries.length
+        };
+    }
+
+    async flushDigestGroup(group) {
+        if (group.finalized) {
+            return;
+        }
+        group.finalized = true;
+        this.digestGroups.delete(this.digestGroupKey(
+            group.channel.id,
+            group.exceptionFileName
+        ));
+        if (group.timer) {
+            this.clearTimer(group.timer);
+        }
+
+        const notification = this.buildDigestNotification(group);
+        await this.trackDelivery(this.deliverDigest(group, notification));
+    }
+
+    async deliverDigest(group, notification) {
+        let status = 'failed';
+        try {
+            const result = await group.channel.send(notification);
+            status = result?.status === 'sent' ? 'sent' : 'failed';
+        } catch (error) {
+            this.logger.error(
+                `[${this.project}] Errore inatteso nel channel ${group.channel.id}`,
+                { message: error.message }
+            );
+        }
+
+        await Promise.all(group.entries.map(async entry => {
+            try {
+                await this.stateStore.complete(entry.key, status);
+            } catch (error) {
+                this.logger.error(
+                    `[${this.project}] Impossibile persistere lo stato della notifica`,
+                    { channelId: group.channel.id, message: error.message }
+                );
+            }
+        }));
     }
 
     buildNotification(pending, timedOut) {
@@ -276,6 +396,9 @@ class ExceptionNotificationManager {
         const pending = [...this.pending];
         for (const item of pending) {
             this.finalizePending(item, false);
+        }
+        for (const group of [...this.digestGroups.values()]) {
+            this.flushDigestGroup(group);
         }
 
         const timeoutMs = options.timeoutMs ?? 15000;

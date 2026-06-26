@@ -10,6 +10,13 @@ class SlackMessageTooLongError extends Error {
     }
 }
 
+class SlackDigestTooLongError extends Error {
+    constructor() {
+        super('Digest eccezioni supera il limite Slack');
+        this.name = 'SlackDigestTooLongError';
+    }
+}
+
 function sanitizeSlackText(value) {
     return String(value ?? '')
         .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, ' ')
@@ -57,7 +64,31 @@ function buildSlackText(notification, before, after, includeOmittedCount = true)
     return lines.join('\n');
 }
 
+function formatExceptionCount(count) {
+    return count === 1
+        ? '1 eccezione rilevata'
+        : `${count} eccezioni rilevate`;
+}
+
+function formatSlackDigestMessage(notification) {
+    const lines = [
+        `${formatExceptionCount(notification.exceptionCount)} sul progetto ${sanitizeSlackText(notification.project)}`,
+        `Ambiente: ${sanitizeSlackText(notification.environment)}`,
+        `File: ${sanitizeSlackText(notification.exceptionFileName)}`,
+        `Rilevazione: ${sanitizeSlackText(notification.detectedAt)}`
+    ];
+    const text = lines.join('\n');
+    if (text.length > MAX_SLACK_TEXT_LENGTH) {
+        throw new SlackDigestTooLongError();
+    }
+    return text;
+}
+
 function formatSlackMessage(notification) {
+    if (notification.type === 'exception-file-digest') {
+        return formatSlackDigestMessage(notification);
+    }
+
     const before = [...(notification.context.before || [])];
     const after = [...(notification.context.after || [])];
     const minimalText = buildSlackText(notification, [], [], false);
@@ -150,6 +181,10 @@ class SlackChannel {
     constructor(config, logger, options = {}) {
         this.id = config.id;
         this.logger = logger;
+        this.grouping = config.grouping || {
+            mode: 'single',
+            flushDelaySeconds: 70
+        };
         this.webhookUrl = options.webhookUrl ?? process.env[config.webhookUrlEnv];
         this.request = options.request ?? postJson;
         this.sleep = options.sleep ?? (milliseconds =>
@@ -162,7 +197,10 @@ class SlackChannel {
         try {
             text = formatSlackMessage(notification);
         } catch (error) {
-            if (error instanceof SlackMessageTooLongError) {
+            if (
+                error instanceof SlackMessageTooLongError
+                || error instanceof SlackDigestTooLongError
+            ) {
                 this.logger.error(
                     `[${notification.project}] Eccezione troppo lunga per il channel ${this.id}: invio non eseguito`
                 );
@@ -235,5 +273,6 @@ module.exports = {
     formatEventLine,
     postJson,
     MAX_SLACK_TEXT_LENGTH,
-    SlackMessageTooLongError
+    SlackMessageTooLongError,
+    SlackDigestTooLongError
 };

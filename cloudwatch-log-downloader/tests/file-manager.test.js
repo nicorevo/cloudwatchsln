@@ -52,7 +52,7 @@ test('scrive nel file eccezioni solo righe incluse e non escluse', async () => {
         exceptionPatterns: ['ERROR'],
         excludeExceptionPatterns: ['Known harmless error']
     }, async (manager, logDirectory) => {
-        await manager.writeLogsToFile([
+        const summary = await manager.writeLogsToFile([
             event('ERROR database unavailable'),
             event('ERROR Known harmless error'),
             event('request completed')
@@ -76,6 +76,10 @@ test('scrive nel file eccezioni solo righe incluse e non escluse', async () => {
         assert.match(main, /request completed/);
         assert.match(exceptions, /ERROR database unavailable/);
         assert.doesNotMatch(exceptions, /Known harmless error/);
+        assert.equal(summary.logFileName, mainFile);
+        assert.equal(summary.exceptionFileName, exceptionFile);
+        assert.equal(summary.writtenLineCount, 3);
+        assert.equal(summary.exceptionLineCount, 1);
     });
 });
 
@@ -84,16 +88,23 @@ test('non crea file eccezioni quando tutte le candidate sono escluse', async () 
         exceptionPatterns: ['ERROR'],
         excludeExceptionPatterns: ['Known harmless error']
     }, async (manager, logDirectory) => {
-        await manager.writeLogsToFile([
+        const summary = await manager.writeLogsToFile([
             event('ERROR Known harmless error')
         ]);
 
         const files = await fs.readdir(logDirectory);
+        const mainFile = files.find(filename =>
+            filename.startsWith('sample-service_')
+        );
         assert.ok(files.some(filename => filename.startsWith('sample-service_')));
         assert.equal(
             files.some(filename => filename.startsWith('sample-service-exceptions_')),
             false
         );
+        assert.equal(summary.logFileName, mainFile);
+        assert.equal(summary.exceptionFileName, null);
+        assert.equal(summary.writtenLineCount, 1);
+        assert.equal(summary.exceptionLineCount, 0);
     });
 });
 

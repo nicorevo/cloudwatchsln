@@ -55,7 +55,8 @@ function createHarness(overrides = {}) {
             id: channel.id,
             type: 'slack',
             enabled: true,
-            webhookUrlEnv: 'IGNORED'
+            webhookUrlEnv: 'IGNORED',
+            grouping: channel.grouping
         }))
     }, {
         info() {},
@@ -76,6 +77,15 @@ function createHarness(overrides = {}) {
     });
 
     return { manager, sent, completed, timers, stateStore };
+}
+
+function writeSummary(exceptionFileName = 'sample-api-logs-exceptions_2026-06-23_10-00.log') {
+    return {
+        logFileName: 'sample-api-logs_2026-06-23_10-00.log',
+        exceptionFileName,
+        writtenLineCount: 3,
+        exceptionLineCount: exceptionFileName ? 3 : 0
+    };
 }
 
 test('raccoglie 5 eventi strutturati prima e 5 dopo dallo stesso stream', async () => {
@@ -229,6 +239,107 @@ test('esegue fan-out e persiste un esito per ogni channel', async () => {
         harness.completed.map(entry => entry.status).sort(),
         ['failed', 'sent']
     );
+});
+
+test('raggruppa eccezioni dello stesso file in un digest per channel', async () => {
+    const harness = createHarness({
+        channels: [{
+            id: 'grouped-slack',
+            grouping: { mode: 'exception-file', flushDelaySeconds: 70 },
+            async send(notification) {
+                harness.sent.push(notification);
+                return { status: 'sent', attempts: 1 };
+            }
+        }]
+    });
+    await harness.manager.init();
+    const base = Date.parse('2026-06-23T10:00:00.000Z');
+
+    harness.manager.ingest([
+        event('exception-a', base, 'stream-a', 'ERROR first'),
+        event('exception-b', base + 1, 'stream-b', 'ERROR second'),
+        event('exception-c', base + 2, 'stream-c', 'ERROR third')
+    ], writeSummary());
+
+    assert.equal(harness.sent.length, 0);
+    const digestTimer = harness.timers.find(timer => timer.milliseconds === 70000);
+    assert.ok(digestTimer);
+    await digestTimer.callback();
+    await harness.manager.waitForIdle();
+
+    assert.equal(harness.sent.length, 1);
+    assert.equal(harness.sent[0].type, 'exception-file-digest');
+    assert.equal(harness.sent[0].exceptionFileName, 'sample-api-logs-exceptions_2026-06-23_10-00.log');
+    assert.equal(harness.sent[0].exceptionCount, 3);
+    assert.equal(harness.completed.length, 3);
+    assert.deepEqual(
+        [...new Set(harness.completed.map(entry => entry.status))],
+        ['sent']
+    );
+});
+
+test('raggruppa file eccezioni distinti in digest distinti', async () => {
+    const harness = createHarness({
+        channels: [{
+            id: 'grouped-slack',
+            grouping: { mode: 'exception-file', flushDelaySeconds: 70 },
+            async send(notification) {
+                harness.sent.push(notification);
+                return { status: 'sent', attempts: 1 };
+            }
+        }]
+    });
+    await harness.manager.init();
+    const base = Date.parse('2026-06-23T10:00:00.000Z');
+
+    harness.manager.ingest([
+        event('exception-a', base, 'stream-a', 'ERROR first')
+    ], writeSummary('sample-api-logs-exceptions_2026-06-23_10-00.log'));
+    harness.manager.ingest([
+        event('exception-b', base + 1, 'stream-a', 'ERROR second')
+    ], writeSummary('sample-api-logs-exceptions_2026-06-23_10-01.log'));
+
+    for (const timer of harness.timers.filter(timer => !timer.cleared)) {
+        await timer.callback();
+    }
+    await harness.manager.waitForIdle();
+
+    assert.equal(harness.sent.length, 2);
+    assert.deepEqual(
+        harness.sent.map(notification => notification.exceptionFileName).sort(),
+        [
+            'sample-api-logs-exceptions_2026-06-23_10-00.log',
+            'sample-api-logs-exceptions_2026-06-23_10-01.log'
+        ]
+    );
+});
+
+test('digest non conta eventi duplicati e viene flushato in shutdown', async () => {
+    const harness = createHarness({
+        channels: [{
+            id: 'grouped-slack',
+            grouping: { mode: 'exception-file', flushDelaySeconds: 70 },
+            async send(notification) {
+                harness.sent.push(notification);
+                return { status: 'sent', attempts: 1 };
+            }
+        }]
+    });
+    await harness.manager.init();
+    const base = Date.parse('2026-06-23T10:00:00.000Z');
+    const duplicate = event('same-event', base, 'stream-a', 'ERROR duplicated');
+
+    harness.manager.ingest([
+        duplicate,
+        { ...duplicate }
+    ], writeSummary());
+
+    await harness.manager.close({ timeoutMs: 100 });
+    await harness.manager.waitForIdle();
+
+    assert.equal(harness.sent.length, 1);
+    assert.equal(harness.sent[0].exceptionCount, 1);
+    assert.equal(harness.completed.length, 1);
 });
 
 test('ignora eventi CloudWatch duplicati nel buffer e nel contesto', async () => {

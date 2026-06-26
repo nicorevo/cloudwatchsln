@@ -115,9 +115,9 @@ class ProjectRunner {
             const events = await this.cloudWatchClient.fetchLogsPaginated(startTime, endTime);
 
             if (events.length > 0) {
-                await this.fileManager.writeLogsToFile(events);
+                const writeSummary = await this.fileManager.writeLogsToFile(events);
                 try {
-                    this.notificationManager?.ingest(events);
+                    this.notificationManager?.ingest(events, writeSummary);
                 } catch (error) {
                     this.logger.error('Errore durante la gestione delle notifiche', {
                         project: this.project,

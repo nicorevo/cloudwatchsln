@@ -46,7 +46,11 @@
           "id": "operations-slack",
           "type": "slack",
           "enabled": false,
-          "webhookUrlEnv": "PRJ01_SLACK_WEBHOOK_URL"
+          "webhookUrlEnv": "PRJ01_SLACK_WEBHOOK_URL",
+          "grouping": {
+            "mode": "single",
+            "flushDelaySeconds": 70
+          }
         }
       ],
       "schedule": {

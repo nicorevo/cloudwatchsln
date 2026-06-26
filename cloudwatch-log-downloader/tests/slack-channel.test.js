@@ -35,6 +35,19 @@ function notification(overrides = {}) {
     };
 }
 
+function digestNotification(overrides = {}) {
+    return {
+        type: 'exception-file-digest',
+        notificationId: 'digest-1',
+        project: 'sample-api',
+        environment: 'prod',
+        detectedAt: '2026-06-23T10:16:00.000Z',
+        exceptionFileName: 'sample-api-logs-exceptions_2026-06-23_10-15.log',
+        exceptionCount: 3,
+        ...overrides
+    };
+}
+
 function createLogger() {
     const calls = [];
     return {
@@ -70,6 +83,43 @@ test('formatSlackMessage include intestazione e righe compatte UTC', () => {
     assert.doesNotMatch(text, /```/);
     assert.doesNotMatch(text, /<!channel>/);
     assert.doesNotMatch(text, /failure\nsecond/);
+});
+
+test('formatSlackMessage formatta digest eccezioni per file', () => {
+    const text = formatSlackMessage(digestNotification({
+        project: '<sample-api>',
+        exceptionFileName: 'sample-api<&>-exceptions_2026-06-23_10-15.log'
+    }));
+
+    assert.match(text, /^3 eccezioni rilevate sul progetto &lt;sample-api&gt;/);
+    assert.match(text, /Ambiente: prod/);
+    assert.match(text, /File: sample-api&lt;&amp;&gt;-exceptions_2026-06-23_10-15\.log/);
+    assert.match(text, /Rilevazione: 2026-06-23T10:16:00\.000Z/);
+    assert.doesNotMatch(text, /Esempi|ERROR|Log group|Log stream|\[ECCEZIONE\]/);
+});
+
+test('formatSlackMessage usa singolare per digest con una eccezione', () => {
+    const text = formatSlackMessage(digestNotification({ exceptionCount: 1 }));
+
+    assert.match(text, /^1 eccezione rilevata sul progetto sample-api/);
+});
+
+test('SlackChannel conserva la configurazione di grouping', () => {
+    const channel = new SlackChannel({
+        id: 'operations-slack',
+        webhookUrlEnv: 'IGNORED',
+        grouping: {
+            mode: 'exception-file',
+            flushDelaySeconds: 70
+        }
+    }, createLogger(), {
+        webhookUrl: 'https://hooks.slack.com/services/test'
+    });
+
+    assert.deepEqual(channel.grouping, {
+        mode: 'exception-file',
+        flushDelaySeconds: 70
+    });
 });
 
 test('formatSlackMessage elimina righe intere lontane senza troncare quelle incluse', () => {
@@ -162,6 +212,33 @@ test('SlackChannel fallisce senza HTTP se intestazione ed eccezione superano il 
             message: `ERROR-${'x'.repeat(MAX_SLACK_TEXT_LENGTH)}`
         },
         context: { before: [], after: [], timedOut: false }
+    }));
+
+    assert.deepEqual(result, { status: 'failed', attempts: 0 });
+    assert.equal(requests, 0);
+    assert.ok(logger.calls.some(call =>
+        call.level === 'error'
+        && call.message.includes('troppo lunga')
+    ));
+});
+
+test('SlackChannel fallisce senza HTTP se digest supera il limite', async () => {
+    let requests = 0;
+    const logger = createLogger();
+    const channel = new SlackChannel({
+        id: 'operations-slack',
+        webhookUrlEnv: 'IGNORED'
+    }, logger, {
+        webhookUrl: 'https://hooks.slack.com/services/test',
+        request: async () => {
+            requests++;
+            return { statusCode: 200, body: 'ok', headers: {} };
+        },
+        sleep: async () => {}
+    });
+
+    const result = await channel.send(digestNotification({
+        project: 'x'.repeat(MAX_SLACK_TEXT_LENGTH)
     }));
 
     assert.deepEqual(result, { status: 'failed', attempts: 0 });
