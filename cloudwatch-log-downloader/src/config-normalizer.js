@@ -28,7 +28,8 @@ const DEFAULT_CLOUDWATCH_FIELDS = {
 
 const DEFAULT_LOG_GROUP_DISCOVERY = {
     activeWindowHours: 4,
-    refreshIntervalMinutes: 10
+    refreshIntervalMinutes: 10,
+    eventualConsistencyGraceMinutes: 90
 };
 
 function isLegacyCloudwatchConfig(config) {
@@ -149,17 +150,21 @@ function normalizeLogGroupDiscovery(discovery = {}, project = 'unknown') {
         ?? DEFAULT_LOG_GROUP_DISCOVERY.activeWindowHours;
     const refreshIntervalMinutes = discovery.refreshIntervalMinutes
         ?? DEFAULT_LOG_GROUP_DISCOVERY.refreshIntervalMinutes;
+    const eventualConsistencyGraceMinutes = discovery.eventualConsistencyGraceMinutes
+        ?? DEFAULT_LOG_GROUP_DISCOVERY.eventualConsistencyGraceMinutes;
 
     if (
         !isPositiveNumber(activeWindowHours)
         || !isNonNegativeInteger(refreshIntervalMinutes)
+        || !isNonNegativeInteger(eventualConsistencyGraceMinutes)
     ) {
         throw new Error(`logGroupDiscovery non valido per progetto ${project}`);
     }
 
     return {
         activeWindowHours,
-        refreshIntervalMinutes
+        refreshIntervalMinutes,
+        eventualConsistencyGraceMinutes
     };
 }
 

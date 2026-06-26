@@ -36,7 +36,7 @@ function createAuthManager() {
     };
 }
 
-function createConfig(logGroups) {
+function createConfig(logGroups, discoveryOverrides = {}) {
     return {
         aws: {
             region: 'eu-central-1',
@@ -46,7 +46,9 @@ function createConfig(logGroups) {
             logGroups,
             logGroupDiscovery: {
                 activeWindowHours: 4,
-                refreshIntervalMinutes: 10
+                refreshIntervalMinutes: 10,
+                eventualConsistencyGraceMinutes: 90,
+                ...discoveryOverrides
             },
             filterPattern: '',
             maxResults: 100000,
@@ -197,6 +199,220 @@ test('CloudWatchClient include solo prefix attivi nella finestra configurata', a
         sentCommands.filter(command => command.constructor.name === 'DescribeLogStreamsCommand').length,
         3
     );
+});
+
+test('CloudWatchClient include prefix con lastIngestionTime recente anche se lastEventTimestamp e vecchio', async () => {
+    const now = Date.parse('2026-06-24T10:00:00.000Z');
+    const fakeClient = {
+        async send(command) {
+            if (command.constructor.name === 'DescribeLogGroupsCommand') {
+                return {
+                    logGroups: [{ logGroupName: '/eks/ns/generated-ingestion' }]
+                };
+            }
+
+            if (command.constructor.name === 'DescribeLogStreamsCommand') {
+                return {
+                    logStreams: [{
+                        lastEventTimestamp: now - (6 * 60 * 60 * 1000),
+                        lastIngestionTime: now - (15 * 60 * 1000)
+                    }]
+                };
+            }
+
+            return { events: [] };
+        }
+    };
+    const client = new TestCloudWatchClient(
+        createConfig([{ type: 'prefix', prefix: '/eks/ns/generated-' }]),
+        createLogger(),
+        createAuthManager(),
+        fakeClient
+    );
+
+    await client.init({ skipCredentialTest: true, now });
+
+    assert.deepEqual(client.logGroups, ['/eks/ns/generated-ingestion']);
+});
+
+test('CloudWatchClient include prefix creati nella grace anche senza stream coerenti', async () => {
+    const now = Date.parse('2026-06-24T10:00:00.000Z');
+    const fakeClient = {
+        async send(command) {
+            if (command.constructor.name === 'DescribeLogGroupsCommand') {
+                return {
+                    logGroups: [
+                        {
+                            logGroupName: '/eks/ns/generated-newly-created',
+                            creationTime: now - (30 * 60 * 1000)
+                        },
+                        {
+                            logGroupName: '/eks/ns/generated-old-empty',
+                            creationTime: now - (3 * 60 * 60 * 1000)
+                        }
+                    ]
+                };
+            }
+
+            if (command.constructor.name === 'DescribeLogStreamsCommand') {
+                return { logStreams: [] };
+            }
+
+            return { events: [] };
+        }
+    };
+    const client = new TestCloudWatchClient(
+        createConfig([{ type: 'prefix', prefix: '/eks/ns/generated-' }]),
+        createLogger(),
+        createAuthManager(),
+        fakeClient
+    );
+
+    await client.init({ skipCredentialTest: true, now });
+
+    assert.deepEqual(client.logGroups, ['/eks/ns/generated-newly-created']);
+});
+
+test('CloudWatchClient disabilita la grace quando eventualConsistencyGraceMinutes e zero', async () => {
+    const now = Date.parse('2026-06-24T10:00:00.000Z');
+    const fakeClient = {
+        async send(command) {
+            if (command.constructor.name === 'DescribeLogGroupsCommand') {
+                return {
+                    logGroups: [{
+                        logGroupName: '/eks/ns/generated-created-now',
+                        creationTime: now
+                    }]
+                };
+            }
+
+            if (command.constructor.name === 'DescribeLogStreamsCommand') {
+                return { logStreams: [] };
+            }
+
+            return { events: [] };
+        }
+    };
+    const client = new TestCloudWatchClient(
+        createConfig([
+            { type: 'complete', name: '/eks/ns/static-worker-prod' },
+            { type: 'prefix', prefix: '/eks/ns/generated-' }
+        ], { eventualConsistencyGraceMinutes: 0 }),
+        createLogger(),
+        createAuthManager(),
+        fakeClient
+    );
+
+    await client.init({ skipCredentialTest: true, now });
+
+    assert.deepEqual(client.logGroups, ['/eks/ns/static-worker-prod']);
+});
+
+test('CloudWatchClient include nomi nuovi da baseline locale durante refresh', async () => {
+    const now = Date.parse('2026-06-24T10:00:00.000Z');
+    let discoveryRun = 0;
+    const fakeClient = {
+        async send(command) {
+            if (command.constructor.name === 'DescribeLogGroupsCommand') {
+                discoveryRun++;
+                return {
+                    logGroups: discoveryRun === 1
+                        ? [
+                            {
+                                logGroupName: '/eks/ns/generated-stays',
+                                creationTime: now - (3 * 60 * 60 * 1000)
+                            }
+                        ]
+                        : [
+                            {
+                                logGroupName: '/eks/ns/generated-stays',
+                                creationTime: now - (3 * 60 * 60 * 1000)
+                            },
+                            {
+                                logGroupName: '/eks/ns/generated-late-metadata',
+                                creationTime: now - (2 * 60 * 60 * 1000)
+                            }
+                        ]
+                };
+            }
+
+            if (command.constructor.name === 'DescribeLogStreamsCommand') {
+                if (command.input.logGroupName.endsWith('stays')) {
+                    return {
+                        logStreams: [{
+                            lastEventTimestamp: now - (30 * 60 * 1000)
+                        }]
+                    };
+                }
+                return { logStreams: [] };
+            }
+
+            return { events: [] };
+        }
+    };
+    const client = new TestCloudWatchClient(
+        createConfig([{ type: 'prefix', prefix: '/eks/ns/generated-' }]),
+        createLogger(),
+        createAuthManager(),
+        fakeClient
+    );
+
+    await client.init({ skipCredentialTest: true, now });
+    assert.deepEqual(client.logGroups, ['/eks/ns/generated-stays']);
+
+    await client.refreshConfiguredLogGroups({ now: now + (10 * 60 * 1000) });
+
+    assert.deepEqual(client.logGroups, [
+        '/eks/ns/generated-late-metadata',
+        '/eks/ns/generated-stays'
+    ]);
+});
+
+test('CloudWatchClient esclude nomi grace scaduti senza metadata recenti', async () => {
+    const now = Date.parse('2026-06-24T10:00:00.000Z');
+    let discoveryRun = 0;
+    const fakeClient = {
+        async send(command) {
+            if (command.constructor.name === 'DescribeLogGroupsCommand') {
+                discoveryRun++;
+                return {
+                    logGroups: discoveryRun === 1
+                        ? []
+                        : [{
+                            logGroupName: '/eks/ns/generated-never-active',
+                            creationTime: now - (3 * 60 * 60 * 1000)
+                        }]
+                };
+            }
+
+            if (command.constructor.name === 'DescribeLogStreamsCommand') {
+                return { logStreams: [] };
+            }
+
+            return { events: [] };
+        }
+    };
+    const client = new TestCloudWatchClient(
+        createConfig([
+            { type: 'complete', name: '/eks/ns/static-worker-prod' },
+            { type: 'prefix', prefix: '/eks/ns/generated-' }
+        ], { eventualConsistencyGraceMinutes: 30 }),
+        createLogger(),
+        createAuthManager(),
+        fakeClient
+    );
+
+    await client.init({ skipCredentialTest: true, now });
+    assert.deepEqual(client.logGroups, ['/eks/ns/static-worker-prod']);
+
+    await client.refreshConfiguredLogGroups({ now: now + (10 * 60 * 1000) });
+    assert.deepEqual(client.logGroups, [
+        '/eks/ns/static-worker-prod',
+        '/eks/ns/generated-never-active'
+    ]);
+
+    await client.refreshConfiguredLogGroups({ now: now + (45 * 60 * 1000) });
+    assert.deepEqual(client.logGroups, ['/eks/ns/static-worker-prod']);
 });
 
 test('CloudWatchClient avvisa se un prefix non trova log group', async () => {

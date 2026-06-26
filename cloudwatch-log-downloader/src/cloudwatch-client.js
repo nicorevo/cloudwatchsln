@@ -21,6 +21,7 @@ class CloudWatchClient {
         this.client = null;
         this.initialized = false;
         this.refreshInProgress = false;
+        this.prefixDiscoveryState = new Map();
     }
 
     normalizeLogGroupEntry(entry) {
@@ -113,7 +114,81 @@ class CloudWatchClient {
         return now - (activeWindowHours * 60 * 60 * 1000);
     }
 
-    async isLogGroupActive(logGroupName, windowStart) {
+    getEventualConsistencyGraceStart(now = Date.now()) {
+        const graceMinutes = this.config.cloudwatch.logGroupDiscovery
+            ?.eventualConsistencyGraceMinutes ?? 90;
+        if (graceMinutes <= 0) {
+            return null;
+        }
+        return now - (graceMinutes * 60 * 1000);
+    }
+
+    isWithinWindow(timestamp, windowStart) {
+        return Number.isFinite(Number(timestamp)) && Number(timestamp) >= windowStart;
+    }
+
+    getPrefixDiscoveryState(prefix) {
+        if (!this.prefixDiscoveryState.has(prefix)) {
+            this.prefixDiscoveryState.set(prefix, {
+                knownNames: new Set(),
+                firstSeenAtByName: new Map(),
+                newNameGraceNames: new Set(),
+                missingCountsByName: new Map(),
+                initialCount: null
+            });
+        }
+
+        return this.prefixDiscoveryState.get(prefix);
+    }
+
+    updatePrefixDiscoveryState(prefix, logGroupNames, options = {}) {
+        const now = options.now ?? Date.now();
+        const state = this.getPrefixDiscoveryState(prefix);
+        const currentNames = new Set(logGroupNames);
+        const newNames = [];
+        const removedNames = [];
+
+        if (state.initialCount === null) {
+            state.initialCount = logGroupNames.length;
+            for (const logGroupName of logGroupNames) {
+                state.knownNames.add(logGroupName);
+                state.firstSeenAtByName.set(logGroupName, now);
+                state.missingCountsByName.set(logGroupName, 0);
+            }
+            return { state, newNames, removedNames };
+        }
+
+        for (const logGroupName of logGroupNames) {
+            if (!state.knownNames.has(logGroupName)) {
+                newNames.push(logGroupName);
+                state.knownNames.add(logGroupName);
+                state.firstSeenAtByName.set(logGroupName, now);
+                state.newNameGraceNames.add(logGroupName);
+            }
+            state.missingCountsByName.set(logGroupName, 0);
+        }
+
+        for (const knownName of [...state.knownNames]) {
+            if (currentNames.has(knownName)) {
+                continue;
+            }
+
+            const missingCount = (state.missingCountsByName.get(knownName) || 0) + 1;
+            if (missingCount >= 2) {
+                removedNames.push(knownName);
+                state.knownNames.delete(knownName);
+                state.firstSeenAtByName.delete(knownName);
+                state.newNameGraceNames.delete(knownName);
+                state.missingCountsByName.delete(knownName);
+            } else {
+                state.missingCountsByName.set(knownName, missingCount);
+            }
+        }
+
+        return { state, newNames, removedNames };
+    }
+
+    async getLatestLogStream(logGroupName) {
         try {
             const response = await this.client.send(
                 new DescribeLogStreamsCommand({
@@ -123,18 +198,60 @@ class CloudWatchClient {
                     limit: 1
                 })
             );
-            const latestStream = (response.logStreams || [])[0];
-            return Number(latestStream?.lastEventTimestamp) >= windowStart;
+            return (response.logStreams || [])[0] || null;
         } catch (error) {
             this.handleAuthError(error);
         }
+    }
+
+    classifyDiscoveredLogGroup(logGroup, latestStream, state, options = {}) {
+        const now = options.now ?? Date.now();
+        const windowStart = this.getDiscoveryWindowStart(now);
+        const graceStart = this.getEventualConsistencyGraceStart(now);
+        const logGroupName = logGroup.logGroupName;
+        const firstSeenAt = state.firstSeenAtByName.get(logGroupName);
+
+        if (this.isWithinWindow(latestStream?.lastEventTimestamp, windowStart)) {
+            return 'recent-activity';
+        }
+
+        if (this.isWithinWindow(latestStream?.lastIngestionTime, windowStart)) {
+            return 'recent-ingestion';
+        }
+
+        if (graceStart !== null && this.isWithinWindow(logGroup.creationTime, graceStart)) {
+            return 'creation-grace';
+        }
+
+        if (
+            graceStart !== null
+            && state.newNameGraceNames.has(logGroupName)
+            && this.isWithinWindow(firstSeenAt, graceStart)
+        ) {
+            return 'new-name-grace';
+        }
+
+        if (
+            state.newNameGraceNames.has(logGroupName)
+            && (graceStart === null || !this.isWithinWindow(firstSeenAt, graceStart))
+        ) {
+            state.newNameGraceNames.delete(logGroupName);
+        }
+
+        return null;
     }
 
     async discoverLogGroupsByPrefix(prefix, options = {}) {
         const discovered = [];
         let ignoredCount = 0;
         let nextToken = null;
-        const windowStart = this.getDiscoveryWindowStart(options.now);
+        const discoveredByReason = {
+            recentActivity: 0,
+            recentIngestion: 0,
+            creationGrace: 0,
+            newNameGrace: 0
+        };
+        const candidateGroups = [];
 
         do {
             try {
@@ -146,34 +263,69 @@ class CloudWatchClient {
                 const response = await this.client.send(
                     new DescribeLogGroupsCommand(params)
                 );
-                const logGroupNames = (response.logGroups || [])
-                    .map(group => group.logGroupName)
-                    .filter(Boolean);
-                for (const logGroupName of logGroupNames) {
-                    if (await this.isLogGroupActive(logGroupName, windowStart)) {
-                        discovered.push(logGroupName);
-                    } else {
-                        ignoredCount++;
-                    }
-                }
+                candidateGroups.push(...(response.logGroups || [])
+                    .filter(group => group?.logGroupName));
                 nextToken = response.nextToken;
             } catch (error) {
                 this.handleAuthError(error);
             }
         } while (nextToken);
 
+        const { state, newNames, removedNames } = this.updatePrefixDiscoveryState(
+            prefix,
+            candidateGroups.map(group => group.logGroupName),
+            options
+        );
+
+        for (const logGroup of candidateGroups) {
+            const latestStream = await this.getLatestLogStream(logGroup.logGroupName);
+            const reason = this.classifyDiscoveredLogGroup(
+                logGroup,
+                latestStream,
+                state,
+                options
+            );
+
+            if (reason) {
+                discovered.push(logGroup.logGroupName);
+                if (reason === 'recent-activity') {
+                    discoveredByReason.recentActivity++;
+                } else if (reason === 'recent-ingestion') {
+                    discoveredByReason.recentIngestion++;
+                } else if (reason === 'creation-grace') {
+                    discoveredByReason.creationGrace++;
+                } else if (reason === 'new-name-grace') {
+                    discoveredByReason.newNameGrace++;
+                }
+            } else {
+                ignoredCount++;
+            }
+        }
+
         discovered.sort();
 
         if (discovered.length === 0) {
             this.logger.warn('Nessun log group trovato per il prefix CloudWatch', {
                 prefix,
-                ignoredCount
+                ignoredCount,
+                initialCount: state.initialCount,
+                currentCount: candidateGroups.length,
+                newCount: newNames.length,
+                removedCount: removedNames.length
             });
         } else {
             this.logger.info('Log group CloudWatch risolti da prefix', {
                 prefix,
                 count: discovered.length,
-                ignoredCount
+                ignoredCount,
+                initialCount: state.initialCount,
+                currentCount: candidateGroups.length,
+                newCount: newNames.length,
+                removedCount: removedNames.length,
+                includedByRecentActivity: discoveredByReason.recentActivity,
+                includedByRecentIngestion: discoveredByReason.recentIngestion,
+                includedByCreationGrace: discoveredByReason.creationGrace,
+                includedByNewNameGrace: discoveredByReason.newNameGrace
             });
         }
 

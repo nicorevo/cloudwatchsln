@@ -226,7 +226,8 @@ test('normalizeConfig applica default schedule files e logging mancanti', () => 
     assert.deepEqual(entry.channels, []);
     assert.deepEqual(entry.logGroupDiscovery, {
         activeWindowHours: 4,
-        refreshIntervalMinutes: 10
+        refreshIntervalMinutes: 10,
+        eventualConsistencyGraceMinutes: 90
     });
 });
 
@@ -236,14 +237,16 @@ test('normalizeConfig normalizza override logGroupDiscovery per progetto', () =>
         cloudwatch: [multiProjectEntry('prj01', {
             logGroupDiscovery: {
                 activeWindowHours: 2,
-                refreshIntervalMinutes: 0
+                refreshIntervalMinutes: 0,
+                eventualConsistencyGraceMinutes: 0
             }
         })]
     });
 
     assert.deepEqual(normalized.cloudwatch[0].logGroupDiscovery, {
         activeWindowHours: 2,
-        refreshIntervalMinutes: 0
+        refreshIntervalMinutes: 0,
+        eventualConsistencyGraceMinutes: 0
     });
 });
 
@@ -254,7 +257,10 @@ test('normalizeConfig rifiuta logGroupDiscovery non valido', () => {
         { activeWindowHours: '4' },
         { refreshIntervalMinutes: -1 },
         { refreshIntervalMinutes: 2.5 },
-        { refreshIntervalMinutes: '10' }
+        { refreshIntervalMinutes: '10' },
+        { eventualConsistencyGraceMinutes: -1 },
+        { eventualConsistencyGraceMinutes: 2.5 },
+        { eventualConsistencyGraceMinutes: '90' }
     ]) {
         assert.throws(
             () => normalizeConfig({

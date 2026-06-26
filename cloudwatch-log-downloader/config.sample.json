@@ -25,7 +25,8 @@
       ],
       "logGroupDiscovery": {
         "activeWindowHours": 4,
-        "refreshIntervalMinutes": 10
+        "refreshIntervalMinutes": 10,
+        "eventualConsistencyGraceMinutes": 90
       },
       "filterPattern": "",
       "maxResults": 100000,
