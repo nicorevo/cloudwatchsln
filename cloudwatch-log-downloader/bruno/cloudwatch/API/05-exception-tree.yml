@@ -1,0 +1,25 @@
+info:
+  name: Exception Tree
+  type: http
+  seq: 5
+
+http:
+  method: GET
+  url: "{{baseUrl}}/api/v1/projects/{{project}}/exceptions/tree"
+  params:
+    - name: limit
+      value: "{{limit}}"
+      type: query
+  headers:
+    - name: Accept
+      value: application/json
+  auth: none
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  Albero dei file eccezioni per progetto. Usare un ID restituito in `files[].exceptions[].id` come `exceptionId`.

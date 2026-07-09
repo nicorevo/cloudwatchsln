@@ -1,0 +1,19 @@
+meta {
+  name: Exception Detail
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/api/v1/projects/{{project}}/exceptions/{{exceptionId}}
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+docs {
+  Dettaglio eccezione con contesto prima/dopo e riferimento al file principale.
+}

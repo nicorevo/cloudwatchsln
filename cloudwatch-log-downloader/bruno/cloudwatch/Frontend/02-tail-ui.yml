@@ -1,0 +1,21 @@
+info:
+  name: Tail UI
+  type: http
+  seq: 2
+
+http:
+  method: GET
+  url: "{{baseUrl}}/tail"
+  headers:
+    - name: Accept
+      value: text/html
+  auth: none
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  Frontend per il tail live dei log locali.

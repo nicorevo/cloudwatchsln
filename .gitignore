@@ -1,6 +1,7 @@
 # Local / private config (never commit)
 cloudwatch-log-downloader/config.uat.json
 cloudwatch-log-downloader/config.prod.json
+cloudwatch-log-downloader/config.prod.json.bak
 cloudwatch-log-downloader/config.json
 cloudwatch-log-downloader/logs/
 cloudwatch-log-downloader/node_modules/

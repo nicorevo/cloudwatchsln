@@ -1,0 +1,19 @@
+meta {
+  name: Project Health
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/api/v1/projects/{{project}}/health
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+docs {
+  Stato di un singolo progetto. Impostare `project` con lo slug presente nella configurazione.
+}

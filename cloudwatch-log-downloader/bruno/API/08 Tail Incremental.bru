@@ -1,0 +1,19 @@
+meta {
+  name: Tail Incremental
+  type: http
+  seq: 8
+}
+
+get {
+  url: {{baseUrl}}/api/v1/projects/{{project}}/tail?limit={{limit}}&after={{cursor}}
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+docs {
+  Lettura incrementale del tail dopo il cursor precedente. Richiede una variabile `cursor` valorizzata.
+}

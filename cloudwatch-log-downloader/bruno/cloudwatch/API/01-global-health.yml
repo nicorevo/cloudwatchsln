@@ -1,0 +1,21 @@
+info:
+  name: Global Health
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{baseUrl}}/api/v1/health"
+  headers:
+    - name: Accept
+      value: application/json
+  auth: none
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  Stato globale del monitor e conteggio file eccezioni per progetto.

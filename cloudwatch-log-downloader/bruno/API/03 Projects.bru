@@ -1,0 +1,19 @@
+meta {
+  name: Projects
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/v1/projects
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+docs {
+  Lista progetti monitorati con filePrefix, logDirectory e log group configurati/risolti.
+}

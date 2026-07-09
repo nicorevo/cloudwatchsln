@@ -1,0 +1,9 @@
+{
+  "version": "1",
+  "name": "CloudWatch Log Downloader",
+  "type": "collection",
+  "ignore": [
+    "node_modules",
+    ".git"
+  ]
+}

@@ -1,0 +1,19 @@
+meta {
+  name: Tail Initial
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{baseUrl}}/api/v1/projects/{{project}}/tail?limit={{limit}}
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+docs {
+  Lettura iniziale del tail. Copiare `cursor` nella variabile ambiente `cursor` per la chiamata incrementale.
+}

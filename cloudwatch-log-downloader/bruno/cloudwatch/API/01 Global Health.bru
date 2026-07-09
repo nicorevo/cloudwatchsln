@@ -1,0 +1,19 @@
+meta {
+  name: Global Health
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/health
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+docs {
+  Stato globale del monitor e conteggio file eccezioni per progetto.
+}

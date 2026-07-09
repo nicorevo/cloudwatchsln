@@ -1,0 +1,19 @@
+meta {
+  name: Legacy Exception Tree
+  type: http
+  seq: 9
+}
+
+get {
+  url: {{baseUrl}}/api/v1/exceptions/tree
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+docs {
+  Endpoint legacy atteso come HTTP 410 GONE. Serve per verificare la migrazione verso gli endpoint scoped per progetto.
+}

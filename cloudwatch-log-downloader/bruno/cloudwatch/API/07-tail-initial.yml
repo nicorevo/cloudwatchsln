@@ -1,0 +1,25 @@
+info:
+  name: Tail Initial
+  type: http
+  seq: 7
+
+http:
+  method: GET
+  url: "{{baseUrl}}/api/v1/projects/{{project}}/tail"
+  params:
+    - name: limit
+      value: "{{limit}}"
+      type: query
+  headers:
+    - name: Accept
+      value: application/json
+  auth: none
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  Lettura iniziale del tail. Copiare `cursor` nella variabile ambiente `cursor` per la chiamata incrementale.
